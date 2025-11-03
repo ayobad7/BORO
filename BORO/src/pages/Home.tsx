@@ -2,8 +2,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import Chip from '@mui/material/Chip';
 import { Link as RouterLink } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,7 +21,10 @@ import type { StorageItem } from '../types';
 export default function Home() {
   const { user } = useAuth();
   const [recent, setRecent] = useState<StorageItem[]>([]);
+  const [borrowed, setBorrowed] = useState<StorageItem[]>([]);
+  const [lent, setLent] = useState<StorageItem[]>([]);
 
+  // Fetch recently added items
   useEffect(() => {
     if (!user) {
       setRecent([]);
@@ -32,7 +34,7 @@ export default function Home() {
       collection(db, 'items'),
       where('ownerId', '==', user.uid),
       orderBy('createdAt', 'desc'),
-      limit(2)
+      limit(3)
     );
     const unsub = onSnapshot(
       q,
@@ -45,7 +47,6 @@ export default function Home() {
       },
       (error) => {
         console.error('Error fetching recent items:', error);
-        // If it's an index error, log helpful message
         if (error.code === 'failed-precondition') {
           console.warn(
             'Firestore index required. Check console for the index creation link.'
@@ -57,13 +58,87 @@ export default function Home() {
     return () => unsub();
   }, [user]);
 
+  // Fetch borrowed items (items I'm borrowing from others)
+  useEffect(() => {
+    if (!user) {
+      setBorrowed([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'items'),
+      where('holderId', '==', user.uid),
+      where('status', '==', 'borrowed'),
+      orderBy('borrowedFrom', 'asc'),
+      limit(3)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const arr = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        })) as StorageItem[];
+        setBorrowed(arr);
+      },
+      (error) => {
+        console.error('Error fetching borrowed items:', error);
+        if (error.code === 'failed-precondition') {
+          console.warn(
+            'Firestore index required for borrowed items. Check console for the index creation link.'
+          );
+        }
+        setBorrowed([]);
+      }
+    );
+    return () => unsub();
+  }, [user]);
+
+  // Fetch lent items (items I own that others are borrowing)
+  useEffect(() => {
+    if (!user) {
+      setLent([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'items'),
+      where('ownerId', '==', user.uid),
+      where('status', '==', 'borrowed'),
+      orderBy('borrowedFrom', 'asc'),
+      limit(3)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const arr = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        })) as StorageItem[];
+        setLent(arr);
+      },
+      (error) => {
+        console.error('Error fetching lent items:', error);
+        if (error.code === 'failed-precondition') {
+          console.warn(
+            'Firestore index required for lent items. Check console for the index creation link.'
+          );
+        }
+        setLent([]);
+      }
+    );
+    return () => unsub();
+  }, [user]);
+
   const hasRecent = useMemo(() => recent && recent.length > 0, [recent]);
+  const hasBorrowed = useMemo(
+    () => borrowed && borrowed.length > 0,
+    [borrowed]
+  );
+  const hasLent = useMemo(() => lent && lent.length > 0, [lent]);
   return (
     <>
       <Navbar />
       <Box
         sx={{
-          width: '100vw',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -73,10 +148,11 @@ export default function Home() {
       >
         <Box
           sx={{
-            width: 1000,
-            maxWidth: '100%',
+            width: '100%',
+            maxWidth: 1000,
             mx: 'auto',
             mt: 6,
+            px: { xs: 2, sm: 3, md: 0 },
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -85,8 +161,8 @@ export default function Home() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr',
-              gap: 3,
+              gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+              gap: { xs: 2, md: 3 },
               width: '100%',
               mb: 6,
               gridAutoRows: 'minmax(160px, auto)',
@@ -98,16 +174,16 @@ export default function Home() {
                 bgcolor: '#D12128',
                 color: '#FAE3AC',
                 pt: 3,
-                px: 3,
-                pb: 1.5,
-                gridColumn: '1 / -1',
-                minHeight: 300,
+                px: { xs: 2, md: 3 },
+                pb: { xs: 2, md: 3 },
+                gridColumn: { xs: '1', md: '1 / -1' },
+                minHeight: { xs: 'auto', md: 300 },
               }}
             >
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: '320px 1fr',
+                  gridTemplateColumns: { xs: '1fr', md: '320px 1fr' },
                   gap: 3,
                   alignItems: 'flex-start',
                 }}
@@ -157,10 +233,10 @@ export default function Home() {
                     borderTopRightRadius: '10px',
                     borderBottomLeftRadius: '10px',
                     borderBottomRightRadius: '10px',
-                    minHeight: 250,
+                    minHeight: { xs: 'auto', md: 230 },
                     pt: 2,
-                    px: 2,
-                    pb: 1,
+                    px: { xs: 2, md: 3 },
+                    pb: 2,
                   }}
                 >
                   <Typography
@@ -173,29 +249,48 @@ export default function Home() {
                   {/* Recent items (from Firestore) or placeholders when not signed in */}
                   <Box
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(1, minmax(0, 1fr))',
-                      gap: 3.5,
+                      display: 'flex',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: { xs: 1.5, md: 3 },
+                      overflowX: { xs: 'auto', md: 'visible' },
                     }}
                   >
                     {hasRecent ? (
-                      recent.map((it) => (
+                      recent.slice(0, 3).map((it) => (
                         <Box
                           key={it.id}
+                          component={RouterLink}
+                          to={`/item/${it.id}`}
                           sx={{
-                            display: 'grid',
-                            gridTemplateColumns: '64px 1fr auto',
-                            alignItems: 'center',
-                            gap: 1.5,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s',
+                            width: { xs: '120px', md: '170px' },
+                            flexShrink: 0,
+                            '&:hover': {
+                              transform: 'translateY(-2px)',
+                            },
                           }}
                         >
-                          <Box sx={{ position: 'relative', width: 64, height: 64 }}>
+                          {/* Image container */}
+                          <Box
+                            sx={{
+                              position: 'relative',
+                              width: '100%',
+                              aspectRatio: '1',
+                              mb: 0.75,
+                            }}
+                          >
                             {it.imageUrls && it.imageUrls[0] ? (
                               <Box
                                 sx={{
-                                  width: 64,
-                                  height: 64,
-                                  borderRadius: 5,
+                                  width: '100%',
+                                  height: '100%',
+                                  borderRadius: 1,
                                   backgroundImage: `url(${it.imageUrls[0]})`,
                                   backgroundSize: 'cover',
                                   backgroundPosition: 'center',
@@ -204,74 +299,69 @@ export default function Home() {
                             ) : (
                               <Box
                                 sx={{
-                                  width: 64,
-                                  height: 64,
+                                  width: '100%',
+                                  height: '100%',
                                   bgcolor: '#D12128',
-                                  borderRadius: 5,
+                                  borderRadius: 1,
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   color: '#1A1A1A',
                                   fontWeight: 700,
+                                  fontSize: '2rem',
                                 }}
                               >
                                 IMG
                               </Box>
                             )}
-                            {/* Status badge: green = available, red = borrowed */}
-                            <Box
+                          </Box>
+                          {/* Text content */}
+                          <Box>
+                            <Chip
+                              label={it.category}
+                              size='small'
+                              color='secondary'
                               sx={{
-                                position: 'absolute',
-                                bottom: 4,
-                                right: 4,
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                bgcolor: it.status === 'available' ? '#4ade80' : '#ef4444',
-                                border: '2px solid #FAE3AC',
+                                fontSize: '0.7rem',
+                                height: '20px',
+                                mb: 0.5,
                               }}
                             />
-                          </Box>
-                          <Box>
                             <Typography
-                              variant='subtitle1'
-                              sx={{ fontWeight: 700, fontSize: '1rem' }}
+                              variant='subtitle2'
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: '1.4rem',
+                                mb: 0.25,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
                             >
                               {it.title}
                             </Typography>
-                            <Typography variant='body2' sx={{ color: '#6b6b6b', fontSize: '0.8125rem' }}>
-                              {it.category}
-                            </Typography>
-                            <Typography variant='body2' sx={{ color: '#6b6b6b', fontSize: '0.8125rem' }}>
-                              {it.location || '—'}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <IconButton
-                              component={RouterLink}
-                              to={`/item/${it.id}`}
+                            <Typography
+                              variant='caption'
                               sx={{
-                                bgcolor: '#033252',
-                                color: '#FAE3AC',
-                                width: 40,
-                                height: 40,
-                                '&:hover': {
-                                  bgcolor: '#022540',
-                                },
+                                color: '#6b6b6b',
+                                fontSize: '1.0rem',
+                                display: 'block',
                               }}
                             >
-                              <ArrowForwardIosIcon fontSize='small' />
-                            </IconButton>
+                              {it.location || '—'}
+                            </Typography>
                           </Box>
                         </Box>
                       ))
                     ) : (
-                      <Typography variant='body2' sx={{ color: '#072B36' }}>
+                      <Typography
+                        variant='body2'
+                        sx={{
+                          color: '#072B36',
+                          textAlign: 'center',
+                          width: '100%',
+                        }}
+                      >
                         {user
                           ? 'No items yet — add your first one.'
                           : 'Sign in to see your recent items.'}
@@ -284,21 +374,158 @@ export default function Home() {
 
             {/* Borrowed - left column */}
             <Card sx={{ bgcolor: '#01344F', color: '#FAE3AC', p: 2 }}>
-              <Typography variant='h6' fontWeight={800} gutterBottom>
-                BORROWED
-              </Typography>
-              <Typography variant='body2' sx={{ mb: 2 }}>
-                Track what you’re borrowing and from whom. We’ll add due chips
-                per item.
-              </Typography>
-              <Button
-                component={RouterLink}
-                to='/storage'
-                variant='contained'
-                color='primary'
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 2,
+                }}
               >
-                View Borrowed
-              </Button>
+                <Typography variant='h6' fontWeight={800}>
+                  BORROWED
+                </Typography>
+                <Button
+                  component={RouterLink}
+                  to='/storage'
+                  variant='contained'
+                  size='small'
+                  sx={{
+                    bgcolor: '#D12128',
+                    '&:hover': { bgcolor: '#b01820' },
+                    textTransform: 'none',
+                  }}
+                >
+                  View
+                </Button>
+              </Box>
+
+              {/* Borrowed items cards */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  justifyContent: 'center',
+                  gap: 2,
+                  mb: 2,
+                  minHeight: { xs: 'auto', md: 180 },
+                }}
+              >
+                {hasBorrowed ? (
+                  borrowed.slice(0, 3).map((it) => (
+                    <Box
+                      key={it.id}
+                      component={RouterLink}
+                      to={`/item/${it.id}`}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s',
+                        width: { xs: '100%', md: '100px' },
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                        },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          width: '100%',
+                          aspectRatio: '1',
+                          mb: 0.5,
+                        }}
+                      >
+                        {it.imageUrls && it.imageUrls[0] ? (
+                          <Box
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              borderRadius: 2,
+                              backgroundImage: `url(${it.imageUrls[0]})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              bgcolor: '#D12128',
+                              borderRadius: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#1A1A1A',
+                              fontWeight: 700,
+                              fontSize: '1.5rem',
+                            }}
+                          >
+                            IMG
+                          </Box>
+                        )}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 4,
+                            right: 4,
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: '#ef4444',
+                            border: '2px solid #FAE3AC',
+                          }}
+                        />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant='caption'
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.8125rem',
+                            mb: 0.25,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            display: 'block',
+                          }}
+                        >
+                          {it.title}
+                        </Typography>
+                        <Typography
+                          variant='caption'
+                          sx={{
+                            color: '#FAE3AC',
+                            opacity: 0.7,
+                            fontSize: '0.6875rem',
+                            display: 'block',
+                          }}
+                        >
+                          {it.category}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography
+                    variant='body2'
+                    sx={{
+                      color: '#FAE3AC',
+                      opacity: 0.7,
+                      textAlign: 'center',
+                      width: '100%',
+                      py: 4,
+                    }}
+                  >
+                    {user
+                      ? "You're not borrowing anything yet."
+                      : 'Sign in to see borrowed items.'}
+                  </Typography>
+                )}
+              </Box>
             </Card>
 
             {/* Favorites - right column spanning two rows */}
@@ -307,7 +534,7 @@ export default function Home() {
                 bgcolor: '#D12128',
                 color: '#FAE3AC',
                 p: 2,
-                gridRow: 'span 2',
+                gridRow: { xs: 'auto', md: 'span 2' },
               }}
             >
               <Typography variant='h6' fontWeight={800} gutterBottom>
@@ -328,20 +555,156 @@ export default function Home() {
 
             {/* Lent - left column below borrowed */}
             <Card sx={{ bgcolor: '#FAE3AC', color: '#1A1A1A', p: 2 }}>
-              <Typography variant='h6' fontWeight={800} gutterBottom>
-                LENT
-              </Typography>
-              <Typography variant='body2' sx={{ mb: 2 }}>
-                See items you lent to friends and their status.
-              </Typography>
-              <Button
-                component={RouterLink}
-                to='/storage'
-                variant='contained'
-                color='secondary'
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 2,
+                }}
               >
-                View Lent Items
-              </Button>
+                <Typography variant='h6' fontWeight={800}>
+                  LENT
+                </Typography>
+                <Button
+                  component={RouterLink}
+                  to='/storage'
+                  variant='contained'
+                  size='small'
+                  sx={{
+                    bgcolor: '#033252',
+                    '&:hover': { bgcolor: '#044a73' },
+                    textTransform: 'none',
+                  }}
+                >
+                  View
+                </Button>
+              </Box>
+
+              {/* Lent items cards */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  justifyContent: 'center',
+                  gap: 2,
+                  mb: 2,
+                  minHeight: { xs: 'auto', md: 180 },
+                }}
+              >
+                {hasLent ? (
+                  lent.slice(0, 3).map((it) => (
+                    <Box
+                      key={it.id}
+                      component={RouterLink}
+                      to={`/item/${it.id}`}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s',
+                        width: { xs: '100%', md: '100px' },
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                        },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          width: '100%',
+                          aspectRatio: '1',
+                          mb: 0.5,
+                        }}
+                      >
+                        {it.imageUrls && it.imageUrls[0] ? (
+                          <Box
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              borderRadius: 2,
+                              backgroundImage: `url(${it.imageUrls[0]})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              bgcolor: '#D12128',
+                              borderRadius: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#1A1A1A',
+                              fontWeight: 700,
+                              fontSize: '1.5rem',
+                            }}
+                          >
+                            IMG
+                          </Box>
+                        )}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 4,
+                            right: 4,
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: '#ef4444',
+                            border: '2px solid #FAE3AC',
+                          }}
+                        />
+                      </Box>
+                      <Box>
+                        <Typography
+                          variant='caption'
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.8125rem',
+                            mb: 0.25,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            display: 'block',
+                          }}
+                        >
+                          {it.title}
+                        </Typography>
+                        <Typography
+                          variant='caption'
+                          sx={{
+                            color: '#6b6b6b',
+                            fontSize: '0.6875rem',
+                            display: 'block',
+                          }}
+                        >
+                          {it.category}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography
+                    variant='body2'
+                    sx={{
+                      color: '#6b6b6b',
+                      textAlign: 'center',
+                      width: '100%',
+                      py: 4,
+                    }}
+                  >
+                    {user
+                      ? "You haven't lent anything yet."
+                      : 'Sign in to see lent items.'}
+                  </Typography>
+                )}
+              </Box>
             </Card>
           </Box>
         </Box>

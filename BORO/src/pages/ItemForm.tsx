@@ -219,23 +219,43 @@ export default function ItemForm() {
                 onChange={(e) => setLocation(e.target.value)}
               />
 
-              <FormLabel>Borrow mode</FormLabel>
-              <RadioGroup
-                row
-                value={borrowMode}
-                onChange={(_, v) => setBorrowMode(v as BorrowMode)}
-              >
-                <FormControlLabel
-                  value='free'
-                  control={<Radio />}
-                  label='Free borrow'
-                />
-                <FormControlLabel
-                  value='request'
-                  control={<Radio />}
-                  label='Request borrow'
-                />
-              </RadioGroup>
+              <Box>
+                <FormLabel>Borrow mode</FormLabel>
+                <RadioGroup
+                  row
+                  value={borrowMode}
+                  onChange={(_, v) => setBorrowMode(v as BorrowMode)}
+                  sx={{ mb: 1 }}
+                >
+                  <FormControlLabel
+                    value='free'
+                    control={<Radio />}
+                    label='Grab'
+                  />
+                  <FormControlLabel
+                    value='request'
+                    control={<Radio />}
+                    label='Request'
+                  />
+                </RadioGroup>
+                <Typography
+                  variant='body2'
+                  color='text.secondary'
+                  sx={{ mb: 1 }}
+                >
+                  {borrowMode === 'free' ? (
+                    <>
+                      <strong>Grab:</strong> Friends can borrow this item
+                      instantly without needing your approval.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Request:</strong> Friends must send a request and
+                      wait for your approval before borrowing.
+                    </>
+                  )}
+                </Typography>
+              </Box>
 
               <ImageUploader max={3} onChange={setFiles} />
 
