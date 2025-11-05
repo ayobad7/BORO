@@ -5,6 +5,7 @@ export interface StorageItem {
   id: string;
   ownerId: string;
   ownerName?: string;
+  ownerPhotoURL?: string;
   holderId: string; // the user currently holding the item (owner or borrower)
   holderName?: string;
   title: string;

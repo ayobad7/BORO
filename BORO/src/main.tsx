@@ -49,6 +49,10 @@ const theme = createTheme({
           borderRadius: 9999,
           textTransform: 'none',
           fontWeight: 600,
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: 'none',
+          },
         },
       },
     },

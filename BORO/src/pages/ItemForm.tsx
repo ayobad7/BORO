@@ -134,6 +134,7 @@ export default function ItemForm() {
         id,
         ownerId: user.uid,
         ownerName: user.displayName || user.email || 'Unknown',
+        ownerPhotoURL: user.photoURL || '',
         holderId: user.uid,
         holderName: user.displayName || user.email || 'Unknown',
         title: title.trim(),
