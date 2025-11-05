@@ -12,7 +12,7 @@ import { LuShare2 } from 'react-icons/lu';
 export function StorageSection({ items }: { items: StorageItem[] }) {
   const hasRecent = items.length > 0;
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: { xs: 4, sm: 5, md: 6 } }}>
       <Box
         sx={{
           display: 'flex',
