@@ -10,8 +10,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  font-family: 'Jost', 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, 'Noto Sans';
+  font-family: 'Plus Jakarta Sans', 'Outfit', 'Jost', 'Varela Round', system-ui,
+    -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans';
   background-color: #1a1a1a;
   color: rgba(255, 255, 255, 0.87);
 }

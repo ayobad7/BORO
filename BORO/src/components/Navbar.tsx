@@ -11,12 +11,13 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
-import InputBase from '@mui/material/InputBase';
+// import InputBase from '@mui/material/InputBase';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import dayjs from 'dayjs';
+import { ui, alpha } from '../lib/uiTokens';
 
 export default function Navbar() {
   const { user, signInWithGoogle, signOutUser } = useAuth();
@@ -24,6 +25,7 @@ export default function Navbar() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -106,6 +108,14 @@ export default function Navbar() {
     };
   }, [user]);
 
+  // Track scroll to apply drop shadow when sticky
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 0);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
@@ -137,12 +147,22 @@ export default function Navbar() {
   };
   return (
     <AppBar
-      position='static'
+      position='sticky'
       color='transparent'
       elevation={0}
-      sx={{ mt: 1.5 }}
+      sx={{
+        top: 0,
+        bgcolor: ui.bg,
+        borderBottom: `1px solid ${ui.border}`,
+        boxShadow: scrolled ? '0 6px 18px rgba(0,0,0,0.35)' : 'none',
+        backdropFilter: scrolled ? 'saturate(120%)' : 'none',
+        borderRadius: 0,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        zIndex: (theme) => theme.zIndex.appBar,
+      }}
     >
-      <Toolbar sx={{ justifyContent: 'center', py: 1.5 }}>
+      <Toolbar sx={{ justifyContent: 'center', py: 1 }}>
         <Box
           sx={{
             width: 1000,
@@ -158,31 +178,13 @@ export default function Navbar() {
             variant='h4'
             component={RouterLink}
             to='/'
-            sx={{ textDecoration: 'none', color: '#D12128', fontWeight: 800 }}
+            sx={{ textDecoration: 'none', color: ui.primary, fontWeight: 800 }}
           >
             BORO
           </Typography>
 
-          {/* Center search */}
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
-            <Box
-              sx={{
-                bgcolor: '#072B36',
-                borderRadius: 15,
-                px: 2,
-                py: 0.75,
-                width: 360,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <InputBase
-                placeholder='Search item'
-                sx={{ color: '#FAE3AC', width: '100%' }}
-                inputProps={{ 'aria-label': 'search item' }}
-              />
-            </Box>
-          </Box>
+          {/* Spacer */}
+          <Box sx={{ flexGrow: 1 }} />
 
           {/* Right actions */}
           <Stack direction='row' spacing={2} alignItems='center'>
@@ -194,8 +196,8 @@ export default function Navbar() {
                       sx={{
                         width: 32,
                         height: 32,
-                        bgcolor: 'primary.main',
-                        color: '#FAE3AC',
+                        bgcolor: alpha(ui.primary, 0.12),
+                        color: ui.primary,
                         fontWeight: 700,
                       }}
                     >
@@ -203,6 +205,20 @@ export default function Navbar() {
                     </Avatar>
                   </Badge>
                 </IconButton>
+                <Button
+                  onClick={signOutUser}
+                  sx={{
+                    bgcolor: ui.neutral,
+                    color: ui.text,
+                    textTransform: 'none',
+                    borderRadius: 9999,
+                    border: `1px solid ${ui.border}`,
+                    px: 1.75,
+                    '&:hover': { bgcolor: '#353A42', borderColor: ui.border },
+                  }}
+                >
+                  Sign out
+                </Button>
                 <Menu
                   anchorEl={anchorEl}
                   open={Boolean(anchorEl)}
@@ -232,7 +248,16 @@ export default function Navbar() {
                 </Menu>
               </>
             ) : (
-              <Button variant='contained' onClick={signInWithGoogle}>
+              <Button
+                variant='contained'
+                onClick={signInWithGoogle}
+                sx={{
+                  bgcolor: ui.primary,
+                  color: '#0A0A0A',
+                  '&:hover': { bgcolor: ui.primaryHover },
+                  textTransform: 'none',
+                }}
+              >
                 Sign in
               </Button>
             )}

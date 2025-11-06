@@ -3,28 +3,32 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
 import { Link as RouterLink } from 'react-router-dom';
+import { ui } from '../../lib/uiTokens';
 
 export function FavoritesSection() {
   return (
     <Box>
-      <Typography variant='h4' fontWeight={700} color='#000' sx={{ mb: 2 }}>
-        FAVORITES
+      <Typography variant='h4' fontWeight={700} color={ui.text} sx={{ mb: 2 }}>
+        Favorites
       </Typography>
       <Card
         sx={{
-          bgcolor: '#fff',
+          bgcolor: '#0f0f10',
+          background: '#0f0f10',
+          backgroundImage: 'none',
           p: 3,
           borderRadius: 2,
           boxShadow: 'none',
-          border: '1px solid #e7e9ef',
+          border: `1px solid ${ui.border}`,
           minHeight: 400,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          color: ui.text,
         }}
       >
-        <Typography variant='body2' color='text.secondary' align='center'>
+        <Typography variant='body2' sx={{ color: ui.subtext }} align='center'>
           Quick access to storages you follow.
         </Typography>
         <Button
@@ -32,8 +36,9 @@ export function FavoritesSection() {
           to='/favorites'
           variant='contained'
           sx={{
-            bgcolor: '#ff5722',
-            '&:hover': { bgcolor: '#f4511e' },
+            bgcolor: ui.primary,
+            color: '#0A0A0A',
+            '&:hover': { bgcolor: ui.primaryHover },
             textTransform: 'none',
             borderRadius: 2,
             mt: 2,

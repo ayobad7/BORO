@@ -2,12 +2,18 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
-import { Link as RouterLink } from 'react-router-dom';
+import Chip from '@mui/material/Chip';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import type { StorageItem } from '../../types';
 import { GrLocation } from 'react-icons/gr';
 import { BiCategoryAlt } from 'react-icons/bi';
+import { PiHandArrowUp, PiTimerBold } from 'react-icons/pi';
+import { ui, alpha } from '../../lib/uiTokens';
+import MetaRow from '../MetaRow';
+import { getDaysLeft, getOverdueDays } from '../../lib/date';
 
 export function LentSection({ items }: { items: StorageItem[] }) {
+  const navigate = useNavigate();
   const hasLent = items.length > 0;
   return (
     <Box>
@@ -19,8 +25,8 @@ export function LentSection({ items }: { items: StorageItem[] }) {
           mb: 2,
         }}
       >
-        <Typography variant='h4' fontWeight={700} color='#000'>
-          LENT
+        <Typography variant='h4' fontWeight={700} color={ui.text}>
+          Lent
         </Typography>
         <Button
           component={RouterLink}
@@ -28,14 +34,15 @@ export function LentSection({ items }: { items: StorageItem[] }) {
           variant='outlined'
           size='small'
           sx={{
-            borderColor: '#ff5722',
-            color: '#ff5722',
+            borderColor: ui.primary,
+            color: ui.primary,
             '&:hover': {
-              borderColor: '#f4511e',
-              bgcolor: 'rgba(255,87,34,0.04)',
+              borderColor: ui.primaryHover,
+              bgcolor: alpha(ui.primary, 0.08),
             },
             textTransform: 'none',
-            borderRadius: 2,
+            borderRadius: 9999,
+            fontWeight: 700,
           }}
         >
           View All
@@ -46,22 +53,25 @@ export function LentSection({ items }: { items: StorageItem[] }) {
           items.slice(0, 3).map((item) => (
             <Card
               key={item.id}
+              onClick={() => navigate(`/item/${item.id}`)}
               sx={{
-                bgcolor: '#fff',
+                bgcolor: '#0f0f10',
+                background: '#0f0f10',
+                backgroundImage: 'none',
                 p: 1.5,
                 borderRadius: 2,
                 boxShadow: 'none',
-                border: '1px solid #e7e9ef',
+                border: `1px solid ${ui.border}`,
                 display: 'flex',
                 gap: 2,
+                color: ui.text,
+                cursor: 'pointer',
               }}
             >
               <Box
-                component={RouterLink}
-                to={`/item/${item.id}`}
                 sx={{
-                  width: 80,
-                  height: 80,
+                  width: 144,
+                  height: 144,
                   borderRadius: 1.2,
                   bgcolor: '#424242',
                   backgroundImage: item.imageUrls?.[0]
@@ -79,75 +89,156 @@ export function LentSection({ items }: { items: StorageItem[] }) {
                   minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
+                  height: 144,
                 }}
               >
-                <Typography
-                  variant='subtitle2'
-                  fontWeight={700}
-                  sx={{
-                    fontSize: 22,
-                    color: '#000',
-                    mb: 0.75,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {item.title}
-                </Typography>
                 <Box
                   sx={{
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    mb: 0.25,
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 2,
                   }}
                 >
-                  <BiCategoryAlt style={{ fontSize: 14, color: '#888888' }} />
-                  <Typography
-                    variant='body2'
+                  <Box
                     sx={{
-                      fontSize: 14,
-                      color: '#888888',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      flex: 1,
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.25,
                     }}
                   >
-                    {item.category}
-                  </Typography>
+                    <Typography
+                      variant='subtitle2'
+                      fontWeight={700}
+                      sx={{
+                        fontSize: 22,
+                        color: ui.text,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        mb: 0.75,
+                      }}
+                    >
+                      {item.title}
+                    </Typography>
+                    <MetaRow
+                      icon={
+                        <BiCategoryAlt
+                          style={{ fontSize: 14, color: ui.subtext }}
+                        />
+                      }
+                      label='Category'
+                      value={item.category}
+                    />
+                    <MetaRow
+                      icon={
+                        <GrLocation
+                          style={{ fontSize: 14, color: ui.subtext }}
+                        />
+                      }
+                      label='Location'
+                      value={item.location || '—'}
+                    />
+                    <MetaRow
+                      icon={
+                        <PiHandArrowUp
+                          style={{ fontSize: 16, color: ui.subtext }}
+                        />
+                      }
+                      label='Borrower'
+                      value={item.holderName || 'Unknown'}
+                    />
+                  </Box>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: 0.5,
+                    }}
+                  >
+                    {(() => {
+                      const daysLeft = getDaysLeft(item.borrowedUntil);
+                      const overdue = getOverdueDays(item.borrowedUntil);
+                      let label = '';
+                      let colorHex: string = ui.primary;
+                      let bg: string = alpha(ui.primary, 0.14);
+
+                      if (overdue > 0) {
+                        colorHex = '#FF8A8A';
+                        bg = alpha('#FF8A8A', 0.16);
+                        label = `Overdue ${overdue} days`;
+                      } else if (daysLeft === 0) {
+                        colorHex = '#FFB37A';
+                        bg = alpha('#FFB37A', 0.16);
+                        label = 'Return today';
+                      } else {
+                        label = `Due in ${daysLeft} days`;
+                      }
+
+                      return (
+                        <Chip
+                          icon={<PiTimerBold style={{ fontSize: 14 }} />}
+                          label={label}
+                          size='small'
+                          sx={{
+                            height: 20,
+                            fontSize: '0.7rem',
+                            bgcolor: bg,
+                            color: colorHex,
+                            '& .MuiChip-icon': { color: colorHex },
+                          }}
+                        />
+                      );
+                    })()}
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <GrLocation style={{ fontSize: 14, color: '#888888' }} />
-                  <Typography
-                    variant='body2'
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: 1,
+                    mt: 'auto',
+                    pt: 1,
+                  }}
+                >
+                  <Button
+                    size='small'
+                    onClick={(e) => e.stopPropagation()}
                     sx={{
-                      fontSize: 14,
-                      color: '#888888',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      bgcolor: alpha(ui.primary, 0.12),
+                      color: ui.primary,
+                      borderRadius: 9999,
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      px: 1.5,
+                      height: 32,
+                      '&:hover': { bgcolor: alpha(ui.primary, 0.18) },
                     }}
                   >
-                    {item.location || '—'}
-                  </Typography>
+                    Remind
+                  </Button>
+                  <Button
+                    variant='contained'
+                    size='small'
+                    onClick={(e) => e.stopPropagation()}
+                    sx={{
+                      bgcolor: ui.primary,
+                      color: '#0A0A0A',
+                      textTransform: 'none',
+                      borderRadius: 2,
+                      height: 32,
+                      px: 1.5,
+                      '&:hover': { bgcolor: ui.primaryHover },
+                    }}
+                  >
+                    Mark Return
+                  </Button>
                 </Box>
               </Box>
-              <Button
-                component={RouterLink}
-                to={`/item/${item.id}`}
-                variant='contained'
-                size='small'
-                sx={{
-                  bgcolor: '#ff5722',
-                  '&:hover': { bgcolor: '#f4511e' },
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  alignSelf: 'center',
-                }}
-              >
-                View
-              </Button>
             </Card>
           ))
         ) : (

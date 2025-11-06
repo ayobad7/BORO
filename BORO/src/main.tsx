@@ -14,12 +14,14 @@ import ItemForm from './pages/ItemForm';
 import ItemDetail from './pages/ItemDetail.tsx';
 import PublicStorage from './pages/PublicStorage.tsx';
 import Favorites from './pages/Favorites.tsx';
+import Style from './pages/Style.tsx';
+import Style2 from './pages/Style2.tsx';
 
 const queryClient = new QueryClient();
 const theme = createTheme({
   typography: {
     fontFamily:
-      '"Jost", "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+      '"Plus Jakarta Sans", "Outfit", "Jost", "Varela Round", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
   },
   palette: {
     mode: 'dark',
@@ -95,6 +97,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path='/item/:id' element={<ItemDetail />} />
                 <Route path='/storage/:userId' element={<PublicStorage />} />
                 <Route path='/favorites' element={<Favorites />} />
+                <Route path='/style' element={<Style />} />
+                <Route path='/style2' element={<Style2 />} />
               </Routes>
             </BrowserRouter>
           </AuthProvider>

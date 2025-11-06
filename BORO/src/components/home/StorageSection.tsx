@@ -2,14 +2,20 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import { Link as RouterLink } from 'react-router-dom';
+// import IconButton from '@mui/material/IconButton';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import type { StorageItem } from '../../types';
 import { GrLocation } from 'react-icons/gr';
 import { BiCategoryAlt } from 'react-icons/bi';
 import { LuShare2 } from 'react-icons/lu';
+import { GrFavorite } from 'react-icons/gr';
+import { CgAdd } from 'react-icons/cg';
+import { ui, alpha } from '../../lib/uiTokens';
+import MetaRow from '../MetaRow';
+import { formatShortDate } from '../../lib/date';
 
 export function StorageSection({ items }: { items: StorageItem[] }) {
+  const navigate = useNavigate();
   const hasRecent = items.length > 0;
   return (
     <Box sx={{ mb: { xs: 4, sm: 5, md: 6 } }}>
@@ -22,10 +28,13 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
         }}
       >
         <Box>
-          <Typography variant='h4' fontWeight={700} color='#000'>
-            STORAGE
+          <Typography variant='h4' fontWeight={700} color={ui.text}>
+            Storage
           </Typography>
-          <Typography variant='body2' sx={{ color: '#000', fontSize: 24 }}>
+          <Typography
+            variant='body2'
+            sx={{ color: ui.text, opacity: 0.9, fontSize: 24 }}
+          >
             Recently added stuff
           </Typography>
         </Box>
@@ -36,13 +45,17 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
             variant='contained'
             size='small'
             sx={{
-              bgcolor: '#ff5722',
-              '&:hover': { bgcolor: '#f4511e' },
+              bgcolor: ui.primary,
+              color: '#0A0A0A',
+              '&:hover': { bgcolor: ui.primaryHover },
               textTransform: 'none',
-              borderRadius: 2,
+              borderRadius: 9999,
+              fontWeight: 700,
+              height: 32,
+              px: 1.5,
             }}
           >
-            Add Item
+            <CgAdd size={18} style={{ marginRight: 6 }} /> Add Item
           </Button>
           <Button
             component={RouterLink}
@@ -50,14 +63,17 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
             variant='outlined'
             size='small'
             sx={{
-              borderColor: '#ff5722',
-              color: '#ff5722',
+              borderColor: ui.primary,
+              color: ui.primary,
               '&:hover': {
-                borderColor: '#f4511e',
-                bgcolor: 'rgba(255,87,34,0.04)',
+                borderColor: ui.primaryHover,
+                bgcolor: alpha(ui.primary, 0.08),
               },
               textTransform: 'none',
-              borderRadius: 2,
+              borderRadius: 9999,
+              fontWeight: 700,
+              height: 32,
+              px: 1.5,
             }}
           >
             View All
@@ -68,25 +84,32 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(3, 1fr)',
+          },
           gap: 2,
         }}
       >
         {hasRecent ? (
-          items.slice(0, 4).map((item) => (
+          items.slice(0, 3).map((item) => (
             <Card
               key={item.id}
+              onClick={() => navigate(`/item/${item.id}`)}
               sx={{
-                bgcolor: '#fff',
+                bgcolor: '#0f0f10',
+                background: '#0f0f10',
+                backgroundImage: 'none',
+                color: ui.text,
                 borderRadius: 2,
                 boxShadow: 'none',
-                border: '1px solid #e7e9ef',
+                border: `1px solid ${ui.border}`,
+                cursor: 'pointer',
               }}
             >
               <Box sx={{ p: 1.5 }}>
                 <Box
-                  component={RouterLink}
-                  to={`/item/${item.id}`}
                   sx={{
                     display: 'block',
                     textDecoration: 'none',
@@ -95,7 +118,7 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
                 >
                   <Box
                     sx={{
-                      border: '1px solid #e7e9ef',
+                      border: `1px solid ${ui.border}`,
                       borderRadius: 1.2,
                       overflow: 'hidden',
                     }}
@@ -124,84 +147,107 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
                   gap: 0.25,
                 }}
               >
-                <Typography
-                  variant='subtitle2'
-                  fontWeight={700}
-                  sx={{
-                    fontSize: 22,
-                    color: '#000',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    mb: 0.75,
-                  }}
-                >
-                  {item.title}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <BiCategoryAlt style={{ fontSize: 14, color: '#888888' }} />
-                  <Typography
-                    variant='body2'
-                    sx={{
-                      fontSize: 14,
-                      color: '#888888',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {item.category}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <GrLocation style={{ fontSize: 14, color: '#888888' }} />
-                  <Typography
-                    variant='body2'
-                    sx={{
-                      fontSize: 14,
-                      color: '#888888',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {item.location || '—'}
-                  </Typography>
-                </Box>
                 <Box
                   sx={{
                     display: 'flex',
-                    justifyContent: 'flex-end',
-                    alignItems: 'center',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
                     gap: 1,
-                    mt: 0.5,
+                    mb: 0.75,
                   }}
                 >
-                  <IconButton
-                    size='small'
+                  <Typography
+                    variant='subtitle2'
+                    fontWeight={700}
                     sx={{
-                      bgcolor: '#ffe5d9',
-                      color: '#ff5722',
-                      height: 30.75,
-                      width: 30.75,
-                      '&:hover': { bgcolor: '#ffd5c4' },
+                      fontSize: 22,
+                      color: ui.text,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: '1 1 auto',
+                      minWidth: 0,
                     }}
                   >
-                    <LuShare2 style={{ fontSize: 16 }} />
-                  </IconButton>
+                    {item.title}
+                  </Typography>
+                  {(() => {
+                    const d = formatShortDate(item.createdAt as unknown);
+                    return d ? (
+                      <Typography
+                        variant='caption'
+                        sx={{
+                          color: ui.subtext,
+                          fontSize: 12,
+                          whiteSpace: 'nowrap',
+                          ml: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {d}
+                      </Typography>
+                    ) : null;
+                  })()}
+                </Box>
+                <MetaRow
+                  icon={
+                    <BiCategoryAlt
+                      style={{ fontSize: 14, color: ui.subtext }}
+                    />
+                  }
+                  label='Category'
+                  value={item.category}
+                />
+                <MetaRow
+                  icon={
+                    <GrLocation style={{ fontSize: 14, color: ui.subtext }} />
+                  }
+                  label='Location'
+                  value={item.location || '—'}
+                />
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    mt: 1.25,
+                  }}
+                >
                   <Button
-                    component={RouterLink}
-                    to={`/item/${item.id}`}
-                    variant='contained'
                     size='small'
+                    onClick={(e) => e.stopPropagation()}
+                    startIcon={<LuShare2 size={16} />}
                     sx={{
-                      bgcolor: '#ff5722',
-                      '&:hover': { bgcolor: '#f4511e' },
+                      bgcolor: alpha(ui.primary, 0.12),
+                      color: ui.primary,
+                      borderRadius: 9999,
+                      fontWeight: 700,
                       textTransform: 'none',
-                      borderRadius: 2,
+                      px: 1.5,
+                      height: 32,
+                      flex: 1,
+                      '&:hover': { bgcolor: alpha(ui.primary, 0.18) },
                     }}
                   >
-                    View
+                    Share
+                  </Button>
+                  <Button
+                    size='small'
+                    onClick={(e) => e.stopPropagation()}
+                    startIcon={<GrFavorite size={16} />}
+                    sx={{
+                      bgcolor: alpha(ui.primary, 0.12),
+                      color: ui.primary,
+                      borderRadius: 9999,
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      px: 1.5,
+                      height: 32,
+                      flex: 1,
+                      '&:hover': { bgcolor: alpha(ui.primary, 0.18) },
+                    }}
+                  >
+                    Favorite
                   </Button>
                 </Box>
               </Box>

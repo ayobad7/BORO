@@ -3,15 +3,17 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import type { StorageItem } from '../../types';
 import { GrLocation } from 'react-icons/gr';
 import { BiCategoryAlt } from 'react-icons/bi';
-import { PiTimerBold } from 'react-icons/pi';
-import { HiOutlineUser } from 'react-icons/hi';
-import { getDaysLeft } from '../../lib/date';
+import { PiTimerBold, PiHandArrowDown } from 'react-icons/pi';
+import { getDaysLeft, getOverdueDays } from '../../lib/date';
+import { ui, alpha } from '../../lib/uiTokens';
+import MetaRow from '../MetaRow';
 
 export function BorrowedSection({ items }: { items: StorageItem[] }) {
+  const navigate = useNavigate();
   const hasBorrowed = items.length > 0;
   return (
     <Box>
@@ -23,8 +25,8 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
           mb: 2,
         }}
       >
-        <Typography variant='h4' fontWeight={700} color='#000'>
-          BORROWED
+        <Typography variant='h4' fontWeight={700} color={ui.text}>
+          Borrowed
         </Typography>
         <Button
           component={RouterLink}
@@ -32,14 +34,15 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
           variant='outlined'
           size='small'
           sx={{
-            borderColor: '#ff5722',
-            color: '#ff5722',
+            borderColor: ui.primary,
+            color: ui.primary,
             '&:hover': {
-              borderColor: '#f4511e',
-              bgcolor: 'rgba(255,87,34,0.04)',
+              borderColor: ui.primaryHover,
+              bgcolor: alpha(ui.primary, 0.08),
             },
             textTransform: 'none',
-            borderRadius: 2,
+            borderRadius: 9999,
+            fontWeight: 700,
           }}
         >
           View All
@@ -50,18 +53,21 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
           items.slice(0, 3).map((item) => (
             <Card
               key={item.id}
+              onClick={() => navigate(`/item/${item.id}`)}
               sx={{
-                bgcolor: '#fff',
+                bgcolor: '#0f0f10',
+                background: '#0f0f10',
+                backgroundImage: 'none',
                 p: 1.5,
                 borderRadius: 2,
                 boxShadow: 'none',
-                border: '1px solid #e7e9ef',
+                border: `1px solid ${ui.border}`,
+                color: ui.text,
+                cursor: 'pointer',
               }}
             >
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Box
-                  component={RouterLink}
-                  to={`/item/${item.id}`}
                   sx={{
                     width: 144,
                     height: 144,
@@ -107,7 +113,7 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
                         fontWeight={700}
                         sx={{
                           fontSize: 22,
-                          color: '#000',
+                          color: ui.text,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -116,63 +122,33 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
                       >
                         {item.title}
                       </Typography>
-                      <Box
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                      >
-                        <BiCategoryAlt
-                          style={{ fontSize: 14, color: '#888888' }}
-                        />
-                        <Typography
-                          variant='body2'
-                          sx={{
-                            fontSize: 14,
-                            color: '#888888',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {item.category}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                      >
-                        <GrLocation
-                          style={{ fontSize: 14, color: '#888888' }}
-                        />
-                        <Typography
-                          variant='body2'
-                          sx={{
-                            fontSize: 14,
-                            color: '#888888',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {item.location || '—'}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                      >
-                        <HiOutlineUser
-                          style={{ fontSize: 14, color: '#888888' }}
-                        />
-                        <Typography
-                          variant='body2'
-                          sx={{
-                            fontSize: 14,
-                            color: '#888888',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {item.ownerName || 'Unknown'}
-                        </Typography>
-                      </Box>
+                      <MetaRow
+                        icon={
+                          <BiCategoryAlt
+                            style={{ fontSize: 14, color: ui.subtext }}
+                          />
+                        }
+                        label='Category'
+                        value={item.category}
+                      />
+                      <MetaRow
+                        icon={
+                          <GrLocation
+                            style={{ fontSize: 14, color: ui.subtext }}
+                          />
+                        }
+                        label='Location'
+                        value={item.location || '—'}
+                      />
+                      <MetaRow
+                        icon={
+                          <PiHandArrowDown
+                            style={{ fontSize: 16, color: ui.subtext }}
+                          />
+                        }
+                        label='Lender'
+                        value={item.ownerName || 'Unknown'}
+                      />
                     </Box>
                     <Box
                       sx={{
@@ -182,22 +158,43 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
                         gap: 0.5,
                       }}
                     >
-                      <Chip
-                        icon={<PiTimerBold style={{ fontSize: 14 }} />}
-                        label={
-                          getDaysLeft(item.borrowedUntil) === 0
-                            ? 'Due today'
-                            : `${getDaysLeft(item.borrowedUntil)} days left`
+                      {(() => {
+                        const daysLeft = getDaysLeft(item.borrowedUntil);
+                        const overdue = getOverdueDays(item.borrowedUntil);
+                        let label = '';
+                        let colorHex: string = ui.primary; // lime by default
+                        let bg: string = alpha(ui.primary, 0.14);
+
+                        if (overdue > 0) {
+                          // Red pastel
+                          colorHex = '#FF8A8A';
+                          bg = alpha('#FF8A8A', 0.16);
+                          label = `Overdue ${overdue} days`;
+                        } else if (daysLeft === 0) {
+                          // Due today - orange chip
+                          colorHex = '#FFB37A';
+                          bg = alpha('#FFB37A', 0.16);
+                          label = 'Due today';
+                        } else {
+                          // X days left - lime
+                          label = `${daysLeft} days left`;
                         }
-                        size='small'
-                        sx={{
-                          height: 20,
-                          fontSize: '0.7rem',
-                          bgcolor: '#ffe5d9',
-                          color: '#ff5722',
-                          '& .MuiChip-icon': { color: '#ff5722' },
-                        }}
-                      />
+
+                        return (
+                          <Chip
+                            icon={<PiTimerBold style={{ fontSize: 14 }} />}
+                            label={label}
+                            size='small'
+                            sx={{
+                              height: 20,
+                              fontSize: '0.7rem',
+                              bgcolor: bg,
+                              color: colorHex,
+                              '& .MuiChip-icon': { color: colorHex },
+                            }}
+                          />
+                        );
+                      })()}
                     </Box>
                   </Box>
                   <Box
@@ -206,56 +203,48 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
                       justifyContent: 'flex-end',
                       gap: 1,
                       mt: 'auto',
+                      pt: 1,
                     }}
                   >
                     <Button
                       variant='contained'
                       size='small'
+                      onClick={(e) => e.stopPropagation()}
                       sx={{
-                        bgcolor: '#f5f5f5',
-                        color: '#888888',
+                        bgcolor: ui.neutral,
+                        color: ui.text,
                         textTransform: 'none',
-                        borderRadius: 2,
+                        borderRadius: 9999,
                         boxShadow: 'none',
-                        border: '1px solid #888888',
+                        border: `1px solid ${ui.border}`,
+                        height: 32,
+                        px: 1.5,
                         '&:hover': {
-                          bgcolor: '#ebebeb',
+                          bgcolor: '#353A42',
                           boxShadow: 'none',
-                          borderColor: '#888888',
+                          borderColor: ui.border,
                         },
                       }}
                     >
                       Extend
                     </Button>
                     <Button
-                      variant='outlined'
+                      variant='contained'
                       size='small'
+                      onClick={(e) => e.stopPropagation()}
                       sx={{
-                        borderColor: '#ff5722',
-                        color: '#ff5722',
+                        bgcolor: ui.primary,
+                        color: '#0A0A0A',
                         textTransform: 'none',
-                        borderRadius: 2,
+                        borderRadius: 9999,
+                        height: 32,
+                        px: 1.5,
                         '&:hover': {
-                          borderColor: '#f4511e',
-                          bgcolor: 'rgba(255,87,34,0.04)',
+                          bgcolor: ui.primaryHover,
                         },
                       }}
                     >
                       Return
-                    </Button>
-                    <Button
-                      component={RouterLink}
-                      to={`/item/${item.id}`}
-                      variant='contained'
-                      size='small'
-                      sx={{
-                        bgcolor: '#ff5722',
-                        '&:hover': { bgcolor: '#f4511e' },
-                        textTransform: 'none',
-                        borderRadius: 2,
-                      }}
-                    >
-                      View
                     </Button>
                   </Box>
                 </Box>

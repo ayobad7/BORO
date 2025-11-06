@@ -88,7 +88,7 @@ export default function ItemForm() {
       let detail = '';
       try {
         const err = await res.json();
-        detail = err?.error?.message || JSON.stringify(err);
+        detail = (err?.error?.message as string) || JSON.stringify(err);
       } catch {
         try {
           detail = await res.text();
@@ -195,9 +195,10 @@ export default function ItemForm() {
               >
                 {[
                   'Tools',
-                  'Electronics',
-                  'Office',
-                  'Home',
+                  'Outfit',
+                  'Stationary',
+                  'Appliances',
+                  'Equipment',
                   'Sports',
                   'Books',
                   'Other',
