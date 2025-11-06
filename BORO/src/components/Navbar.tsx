@@ -15,7 +15,14 @@ import Box from '@mui/material/Box';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  updateDoc,
+  doc,
+} from 'firebase/firestore';
 import dayjs from 'dayjs';
 import { ui, alpha } from '../lib/uiTokens';
 
@@ -96,6 +103,23 @@ export default function Navbar() {
       updateNotifications();
     });
 
+    // Listen for return notifications (items I own that were returned)
+    const returnsQuery = query(
+      collection(db, 'notifications'),
+      where('ownerId', '==', user.uid),
+      where('type', '==', 'return'),
+      where('read', '==', false)
+    );
+    const unsubReturns = onSnapshot(returnsQuery, (snap) => {
+      const arr = snap.docs.map((d) => ({
+        id: d.id,
+        type: 'return',
+        ...d.data(),
+      }));
+      notifs.push(...arr);
+      updateNotifications();
+    });
+
     function updateNotifications() {
       setNotifications([...notifs]);
       setNotificationCount(notifs.length);
@@ -105,6 +129,7 @@ export default function Navbar() {
       unsubBorrowRequests();
       unsubExtendRequests();
       unsubItems();
+      unsubReturns();
     };
   }, [user]);
 
@@ -133,6 +158,12 @@ export default function Navbar() {
       navigate(`/item/${notification.itemId}`);
     } else if (notification.type === 'overdue') {
       navigate(`/item/${notification.id}`);
+    } else if (notification.type === 'return') {
+      // Mark as read and navigate to item
+      try {
+        updateDoc(doc(db, 'notifications', notification.id), { read: true });
+      } catch {}
+      navigate(`/item/${notification.itemId}`);
     }
   };
 
@@ -199,6 +230,7 @@ export default function Navbar() {
                         bgcolor: alpha(ui.primary, 0.12),
                         color: ui.primary,
                         fontWeight: 700,
+                        fontSize: 12,
                       }}
                     >
                       {getInitials(user.displayName || user.email)}
@@ -240,6 +272,10 @@ export default function Navbar() {
                           `Overdue: ${notif.itemTitle} (Due: ${new Date(
                             notif.dueDate
                           ).toLocaleDateString()})`}
+                        {notif.type === 'return' &&
+                          `${notif.borrowerName || 'Someone'} returned ${
+                            notif.itemTitle
+                          }`}
                       </MenuItem>
                     ))
                   )}

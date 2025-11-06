@@ -152,6 +152,8 @@ export default function ItemDetail() {
     if (!item || !isOwner) return;
     setSaving(true);
     try {
+      const borrowerId = item.holderId;
+      const borrowerName = item.holderName || 'Unknown';
       const ref = doc(db, 'items', item.id);
       await updateDoc(ref, {
         status: 'available',
@@ -160,6 +162,20 @@ export default function ItemDetail() {
         borrowedFrom: null,
         borrowedUntil: null,
         updatedAt: serverTimestamp(),
+      });
+      // Create a return notification for the owner
+      const notifId = uuidv4();
+      await setDoc(doc(collection(db, 'notifications'), notifId), {
+        id: notifId,
+        type: 'return',
+        ownerId: item.ownerId,
+        itemId: item.id,
+        itemTitle: item.title,
+        borrowerId,
+        borrowerName,
+        read: false,
+        createdAt: serverTimestamp(),
+        returnedAt: serverTimestamp(),
       });
     } catch (e: any) {
       setError(e.message || 'Failed to mark returned');
@@ -186,6 +202,20 @@ export default function ItemDetail() {
         borrowedFrom: null,
         borrowedUntil: null,
         updatedAt: serverTimestamp(),
+      });
+      // Create a return notification for the owner
+      const notifId = uuidv4();
+      await setDoc(doc(collection(db, 'notifications'), notifId), {
+        id: notifId,
+        type: 'return',
+        ownerId: item.ownerId,
+        itemId: item.id,
+        itemTitle: item.title,
+        borrowerId: user.uid,
+        borrowerName: user.displayName || user.email || 'Unknown',
+        read: false,
+        createdAt: serverTimestamp(),
+        returnedAt: serverTimestamp(),
       });
     } catch (e: any) {
       setError(e.message || 'Failed to return item');

@@ -69,8 +69,8 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Box
                   sx={{
-                    width: 144,
-                    height: 144,
+                    width: 160,
+                    height: 160,
                     borderRadius: 1.2,
                     bgcolor: '#424242',
                     backgroundImage: item.imageUrls?.[0]
@@ -88,7 +88,7 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
                     minWidth: 0,
                     display: 'flex',
                     flexDirection: 'column',
-                    height: 144,
+                    height: 160,
                   }}
                 >
                   <Box

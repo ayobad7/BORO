@@ -23,11 +23,15 @@ import { db } from '../lib/firebase';
 import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { BorrowMode } from '../types';
 
+const LOCATION_MAX = 80;
 const schema = z.object({
   title: z.string().min(1),
   category: z.string().min(1),
   description: z.string().optional(),
-  location: z.string().optional(),
+  location: z
+    .string()
+    .min(1, 'Location is required')
+    .max(LOCATION_MAX, `Location must be at most ${LOCATION_MAX} characters`),
   borrowMode: z.union([z.literal('free'), z.literal('request')]),
 });
 
@@ -46,12 +50,17 @@ export default function ItemForm() {
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState(false);
 
   const { user } = useAuth();
 
   const canSubmit = useMemo(
-    () => title.trim().length > 0 && category.trim().length > 0,
-    [title, category]
+    () =>
+      title.trim().length > 0 &&
+      category.trim().length > 0 &&
+      location.trim().length > 0 &&
+      files.length > 0,
+    [title, category, location, files]
   );
 
   const uploadToCloudinary = async (file: File): Promise<string> => {
@@ -108,6 +117,17 @@ export default function ItemForm() {
 
   const onSubmit = async () => {
     if (!user) return;
+    setAttempted(true);
+    if (location.trim().length === 0 || files.length === 0) {
+      setErrorMsg(
+        files.length === 0 && location.trim().length === 0
+          ? 'Please add a location and upload at least one image.'
+          : location.trim().length === 0
+          ? 'Please add a location.'
+          : 'Please upload at least one image.'
+      );
+      return;
+    }
     const parse = schema.safeParse({
       title,
       category,
@@ -219,6 +239,14 @@ export default function ItemForm() {
                 label='Location'
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                required
+                error={attempted && location.trim().length === 0}
+                helperText={
+                  attempted && location.trim().length === 0
+                    ? 'Location is required'
+                    : `${location.length}/${LOCATION_MAX}`
+                }
+                inputProps={{ maxLength: LOCATION_MAX }}
               />
 
               <Box>
@@ -260,6 +288,11 @@ export default function ItemForm() {
               </Box>
 
               <ImageUploader max={3} onChange={setFiles} />
+              {attempted && files.length === 0 && (
+                <Typography variant='caption' color='error'>
+                  Please upload at least one image.
+                </Typography>
+              )}
 
               <Stack direction='row' spacing={2} alignItems='center'>
                 <Button

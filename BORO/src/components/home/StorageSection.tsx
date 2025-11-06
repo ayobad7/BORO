@@ -9,6 +9,7 @@ import { GrLocation } from 'react-icons/gr';
 import { BiCategoryAlt } from 'react-icons/bi';
 import { LuShare2 } from 'react-icons/lu';
 import { GrFavorite } from 'react-icons/gr';
+import { TbSettings2 } from 'react-icons/tb';
 import { CgAdd } from 'react-icons/cg';
 import { ui, alpha } from '../../lib/uiTokens';
 import MetaRow from '../MetaRow';
@@ -204,6 +205,13 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
                   }
                   label='Location'
                   value={item.location || '—'}
+                />
+                <MetaRow
+                  icon={
+                    <TbSettings2 style={{ fontSize: 14, color: ui.subtext }} />
+                  }
+                  label='Mode'
+                  value={item.borrowMode === 'free' ? 'Free' : 'Request'}
                 />
                 <Box
                   sx={{
