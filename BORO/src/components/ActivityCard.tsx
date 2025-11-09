@@ -1,12 +1,16 @@
 import Box from '@mui/material/Box';
+import { useState } from 'react';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Snackbar from '@mui/material/Snackbar';
 import { Link as RouterLink } from 'react-router-dom';
 import type { StorageItem } from '../types';
 import { BiCategoryAlt } from 'react-icons/bi';
 import { GrLocation } from 'react-icons/gr';
-import { PiHandArrowDown, PiHandArrowUp, PiTimerBold } from 'react-icons/pi';
+import { PiHandArrowDown, PiTimerBold } from 'react-icons/pi';
+import { FiFileText } from 'react-icons/fi';
 import { LuShare2 } from 'react-icons/lu';
 import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai';
 import { TbLock, TbLockOpen } from 'react-icons/tb';
@@ -30,6 +34,29 @@ export default function ActivityCard({
   isFavorite,
   onToggleFavorite,
 }: ActivityCardProps) {
+  const [copiedOpen, setCopiedOpen] = useState(false);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const url = `${window.location.origin}/item/${item.id}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedOpen(true);
+    } catch (err) {
+      // ignore copy errors
+      setCopiedOpen(true);
+    }
+  };
   // Compute due status string for borrowed/lent; returns value string or null
   const getDueStatus = (): string | null => {
     if (!item.borrowedUntil || (type !== 'borrowed' && type !== 'lent'))
@@ -205,15 +232,14 @@ export default function ActivityCard({
             {item.title}
           </Typography>
           {/* Share & Favorite icons in title row */}
-          <LuShare2
-            size={18}
-            color='#8ca2ba'
-            style={{ cursor: 'pointer', flexShrink: 0 }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          />
+          <IconButton
+            size='small'
+            onClick={handleShare}
+            sx={{ color: '#8ca2ba', flexShrink: 0 }}
+            aria-label='share'
+          >
+            <LuShare2 size={18} />
+          </IconButton>
           {isFavorite ? (
             <AiFillHeart
               size={18}
@@ -322,6 +348,13 @@ export default function ActivityCard({
             label='Location'
             value={item.location || '—'}
           />
+            {item.note && (
+              <IconLine
+                icon={<FiFileText size={14} />}
+                label='Notes'
+                value={item.note}
+              />
+            )}
           {type === 'borrowed' && (
             <IconLine
               icon={<PiHandArrowDown size={14} />}
@@ -518,6 +551,44 @@ export default function ActivityCard({
         }}
       />
       {/* bottom-right badge removed in favor of inner image placement */}
+      <Snackbar
+        open={copiedOpen}
+        autoHideDuration={1800}
+        onClose={() => setCopiedOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        ContentProps={{
+          sx: {
+            bgcolor: '#0f1318',
+            color: '#e9eef7',
+            border: '1px solid #23293a',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            borderRadius: '12px',
+            px: 1.5,
+            py: 0.7,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            minWidth: 180,
+            justifyContent: 'center',
+          },
+        }}
+        message={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'linear-gradient(90deg,#6bd6ff,#7f8cff)',
+                boxShadow: '0 2px 8px rgba(127,140,255,0.18) inset',
+              }}
+            />
+            <Typography variant='caption' sx={{ color: '#e9eef7', fontWeight: 700 }}>
+              URL copied to clipboard
+            </Typography>
+          </Box>
+        }
+      />
     </Box>
   );
 }

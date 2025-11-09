@@ -154,7 +154,8 @@ export default function Navbar() {
         <Box
           sx={{
             width: '100%',
-            maxWidth: 1100,
+            // Match page container max width used across pages (Home2 uses 1400)
+            maxWidth: 1400,
             mx: 'auto',
             px: { xs: 2, sm: 3 },
             display: 'flex',
