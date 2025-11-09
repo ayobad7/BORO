@@ -7,7 +7,7 @@ import { GrLocation } from 'react-icons/gr';
 import { PiTimerBold, PiHandArrowDown, PiHandArrowUp } from 'react-icons/pi';
 import { LuShare2 } from 'react-icons/lu';
 import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai';
-import { TbLock, TbLockOpen } from 'react-icons/tb';
+import { TbLockOpen } from 'react-icons/tb';
 import { ACCENTS } from '../lib/accents';
 
 export default function CardRevamp() {

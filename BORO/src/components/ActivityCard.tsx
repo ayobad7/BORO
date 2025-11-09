@@ -25,6 +25,11 @@ interface ActivityCardProps {
   accentColor: string; // accent derived per type
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  // when false, viewer is not the owner of the item (e.g., viewing someone else's storage)
+  viewerIsOwner?: boolean;
+  // id of the current viewer (signed-in user). If provided the card will compute
+  // whether the viewer is the owner or the current holder and show appropriate actions.
+  viewerId?: string | null;
 }
 
 export default function ActivityCard({
@@ -33,6 +38,8 @@ export default function ActivityCard({
   accentColor,
   isFavorite,
   onToggleFavorite,
+  viewerIsOwner,
+  viewerId = null,
 }: ActivityCardProps) {
   const [copiedOpen, setCopiedOpen] = useState(false);
 
@@ -145,6 +152,10 @@ export default function ActivityCard({
     return `${months} months ago`;
   };
 
+  // Resolve viewer relationship to this item. Priority: explicit viewerIsOwner prop, else derive from viewerId. Default: true (owner) to preserve existing behavior.
+  const resolvedViewerIsOwner = typeof viewerIsOwner === 'boolean' ? viewerIsOwner : (viewerId ? viewerId === item.ownerId : true);
+  const resolvedViewerIsHolder = viewerId ? viewerId === item.holderId : false;
+
   return (
     <Box
       component={RouterLink}
@@ -162,7 +173,7 @@ export default function ActivityCard({
         // Increased outer radius for softer card rounding
         borderRadius: 'var(--card-r)',
         boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-        overflow: 'hidden',
+  overflow: 'hidden',
         breakInside: 'avoid',
         WebkitColumnBreakInside: 'avoid',
         transition: 'transform .18s ease, box-shadow .18s ease',
@@ -201,8 +212,6 @@ export default function ActivityCard({
           ) : null}
         </Box>
       </Box>
-
-      {/* Content */}
       <Box
         sx={{
           px: 'var(--pad)',
@@ -379,16 +388,28 @@ export default function ActivityCard({
             <Typography variant='caption' sx={{ color: '#7a8799', fontSize: 11 }}>
               Added {formatAddedDate(item.createdAt)}
             </Typography>
-            <Typography
-              variant='caption'
-              sx={{
-                color: accentColor,
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
-              Available
-            </Typography>
+            {resolvedViewerIsOwner ? (
+              <Typography
+                variant='caption'
+                sx={{
+                  color: accentColor,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Available
+              </Typography>
+            ) : (
+              <Box>
+                <Button
+                  size='small'
+                  variant={item.borrowMode === 'free' ? 'contained' : 'outlined'}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {item.borrowMode === 'free' ? 'Borrow' : 'Request borrow'}
+                </Button>
+              </Box>
+            )}
           </Box>
         )}
 
@@ -455,90 +476,101 @@ export default function ActivityCard({
             <Box sx={{ display: 'flex', gap: 0.75 }}>
               {type === 'borrowed' && (
                 <>
-                  <Button
-                    variant='outlined'
-                    size='small'
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    sx={{
-                      borderColor: '#2a3144',
-                      color: accentColor,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      flex: 1,
-                    }}
-                  >
-                    Extend
-                  </Button>
-                  <Button
-                    variant='contained'
-                    size='small'
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    sx={{
-                      bgcolor: accentColor,
-                      color: '#0a0a0a',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      textTransform: 'none',
-                      flex: 1,
-                      '&:hover': { bgcolor: accentColor },
-                    }}
-                  >
-                    Return
-                  </Button>
+                  {/* Borrower actions: only show if the viewer is the current holder */}
+                  {resolvedViewerIsHolder && (
+                    <>
+                      <Button
+                        variant='outlined'
+                        size='small'
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        sx={{
+                          borderColor: '#2a3144',
+                          color: accentColor,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          flex: 1,
+                        }}
+                      >
+                        Extend
+                      </Button>
+                      <Button
+                        variant='contained'
+                        size='small'
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        sx={{
+                          bgcolor: accentColor,
+                          color: '#0a0a0a',
+                          fontSize: 12,
+                          fontWeight: 800,
+                          textTransform: 'none',
+                          flex: 1,
+                          '&:hover': { bgcolor: accentColor },
+                        }}
+                      >
+                        Return
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
               {type === 'lent' && (
                 <>
-                  <Button
-                    variant='outlined'
-                    size='small'
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    sx={{
-                      borderColor: '#2a3144',
-                      color: accentColor,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      flex: 1,
-                    }}
-                  >
-                    Remind
-                  </Button>
-                  <Button
-                    variant='contained'
-                    size='small'
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    sx={{
-                      bgcolor: accentColor,
-                      color: '#0a0a0a',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      textTransform: 'none',
-                      flex: 1,
-                      '&:hover': { bgcolor: accentColor },
-                    }}
-                  >
-                    Returned
-                  </Button>
+                  {/* Owner actions: only show if the viewer is the owner of the item */}
+                  {resolvedViewerIsOwner && (
+                    <>
+                      <Button
+                        variant='outlined'
+                        size='small'
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        sx={{
+                          borderColor: '#2a3144',
+                          color: accentColor,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          flex: 1,
+                        }}
+                      >
+                        Remind
+                      </Button>
+                      <Button
+                        variant='contained'
+                        size='small'
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        sx={{
+                          bgcolor: accentColor,
+                          color: '#0a0a0a',
+                          fontSize: 12,
+                          fontWeight: 800,
+                          textTransform: 'none',
+                          flex: 1,
+                          '&:hover': { bgcolor: accentColor },
+                        }}
+                      >
+                        Returned
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </Box>
           </>
         )}
       </Box>
+      {/* (media moved above) */}
       {/* Accessibility focus ring */}
       <Box
         component='span'
