@@ -1,0 +1,29 @@
+/* Masonry grid layout for activity feed */
+.my-masonry-grid {
+  display: flex;
+  margin-left: -16px; /* gutter size offset */
+  width: auto;
+}
+
+.my-masonry-grid_column {
+  padding-left: 16px; /* gutter size */
+  background-clip: padding-box;
+}
+
+/* Style for each card item in masonry - IMPORTANT: all children get margin */
+.my-masonry-grid_column > * {
+  margin-bottom: 16px;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 640px) {
+  .my-masonry-grid {
+    margin-left: -12px;
+  }
+  .my-masonry-grid_column {
+    padding-left: 12px;
+  }
+  .my-masonry-grid_column > * {
+    margin-bottom: 12px;
+  }
+}

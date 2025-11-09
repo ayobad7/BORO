@@ -10,6 +10,15 @@ export interface StorageItem {
   holderName?: string;
   title: string;
   category: string;
+  /**
+   * Free-form note about handling or special instructions.
+   * Prefer note over description; kept optional for backward compatibility.
+   */
+  note?: string;
+  /**
+   * Legacy field kept for compatibility. If present and note is empty,
+   * UI may fall back to showing description.
+   */
   description?: string;
   location?: string;
   imageUrls: string[]; // up to 3

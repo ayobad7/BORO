@@ -56,7 +56,7 @@ export function BorrowedSection({ items }: { items: StorageItem[] }) {
               onClick={() => navigate(`/item/${item.id}`)}
               sx={{
                 bgcolor: '#0f0f10',
-                background: '#0f0f10',
+                background: '#1b1b1c',
                 backgroundImage: 'none',
                 p: 1.5,
                 borderRadius: 2,

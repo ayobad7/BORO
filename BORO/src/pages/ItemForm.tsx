@@ -27,7 +27,7 @@ const LOCATION_MAX = 80;
 const schema = z.object({
   title: z.string().min(1),
   category: z.string().min(1),
-  description: z.string().optional(),
+  note: z.string().optional(),
   location: z
     .string()
     .min(1, 'Location is required')
@@ -44,7 +44,7 @@ export default function ItemForm() {
   const query = useQuery();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(query.get('category') || '');
-  const [description, setDescription] = useState('');
+  const [note, setNote] = useState('');
   const [location, setLocation] = useState('');
   const [borrowMode, setBorrowMode] = useState<BorrowMode>('free');
   const [files, setFiles] = useState<File[]>([]);
@@ -131,7 +131,7 @@ export default function ItemForm() {
     const parse = schema.safeParse({
       title,
       category,
-      description,
+      note,
       location,
       borrowMode,
     });
@@ -167,8 +167,11 @@ export default function ItemForm() {
       };
 
       // Only add optional fields if they have values
-      if (description.trim()) {
-        docData.description = description.trim();
+      if (note.trim()) {
+        // Write new preferred field
+        docData.note = note.trim();
+        // For backward compatibility you may keep description mirror (optional)
+        // docData.description = note.trim();
       }
       if (location.trim()) {
         docData.location = location.trim();
@@ -229,11 +232,12 @@ export default function ItemForm() {
                 ))}
               </TextField>
               <TextField
-                label='Description'
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                label='Notes (care, instructions, handling)'
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
                 multiline
                 minRows={3}
+                placeholder='e.g. Keep lens cap on, store in dry case, charge weekly…'
               />
               <TextField
                 label='Location'

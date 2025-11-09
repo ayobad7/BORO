@@ -100,7 +100,7 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
               onClick={() => navigate(`/item/${item.id}`)}
               sx={{
                 bgcolor: '#0f0f10',
-                background: '#0f0f10',
+                background: '#1b1b1c',
                 backgroundImage: 'none',
                 color: ui.text,
                 borderRadius: 2,
@@ -109,7 +109,7 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
                 cursor: 'pointer',
               }}
             >
-              <Box sx={{ p: 1.5 }}>
+              <Box sx={{ p: 1.75 }}>
                 <Box
                   sx={{
                     display: 'block',
@@ -119,7 +119,6 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
                 >
                   <Box
                     sx={{
-                      border: `1px solid ${ui.border}`,
                       borderRadius: 1.2,
                       overflow: 'hidden',
                     }}
@@ -141,8 +140,8 @@ export function StorageSection({ items }: { items: StorageItem[] }) {
               </Box>
               <Box
                 sx={{
-                  px: 1.5,
-                  pb: 1.5,
+                  px: 1.75,
+                  pb: 1.75,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.25,

@@ -9,6 +9,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import './index.css';
 import { AuthProvider } from './context/AuthContext';
 import Home from './pages/Home';
+import Home2 from './pages/Home2';
 import Storage from './pages/Storage';
 import ItemForm from './pages/ItemForm';
 import ItemDetail from './pages/ItemDetail.tsx';
@@ -16,6 +17,8 @@ import PublicStorage from './pages/PublicStorage.tsx';
 import Favorites from './pages/Favorites.tsx';
 import Style from './pages/Style.tsx';
 import Style2 from './pages/Style2.tsx';
+import ActivityPage from './pages/ActivityPage.tsx';
+import CardRevamp from './pages/CardRevamp.tsx';
 
 const queryClient = new QueryClient();
 const theme = createTheme({
@@ -92,6 +95,7 @@ createRoot(document.getElementById('root')!).render(
             <BrowserRouter>
               <Routes>
                 <Route path='/' element={<Home />} />
+                <Route path='/home2' element={<Home2 />} />
                 <Route path='/storage' element={<Storage />} />
                 <Route path='/item/new' element={<ItemForm />} />
                 <Route path='/item/:id' element={<ItemDetail />} />
@@ -99,6 +103,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path='/favorites' element={<Favorites />} />
                 <Route path='/style' element={<Style />} />
                 <Route path='/style2' element={<Style2 />} />
+                <Route path='/activity' element={<ActivityPage />} />
+                <Route path='/card-revamp' element={<CardRevamp />} />
               </Routes>
             </BrowserRouter>
           </AuthProvider>

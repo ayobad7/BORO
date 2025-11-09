@@ -11,20 +11,13 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
-// import InputBase from '@mui/material/InputBase';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  updateDoc,
-  doc,
-} from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import dayjs from 'dayjs';
-import { ui, alpha } from '../lib/uiTokens';
+import { ui } from '../lib/uiTokens';
+import { ACCENTS } from '../lib/accents';
 
 export default function Navbar() {
   const { user, signInWithGoogle, signOutUser } = useAuth();
@@ -43,39 +36,28 @@ export default function Navbar() {
 
     const notifs: any[] = [];
 
-    // Listen for pending borrow requests (items I own)
     const borrowRequestsQuery = query(
       collection(db, 'borrowRequests'),
       where('ownerId', '==', user.uid),
       where('status', '==', 'pending')
     );
     const unsubBorrowRequests = onSnapshot(borrowRequestsQuery, (snap) => {
-      const requests = snap.docs.map((d) => ({
-        id: d.id,
-        type: 'borrowRequest',
-        ...d.data(),
-      }));
+      const requests = snap.docs.map((d) => ({ id: d.id, type: 'borrowRequest', ...d.data() }));
       notifs.push(...requests);
       updateNotifications();
     });
 
-    // Listen for pending extend requests (items I own)
     const extendRequestsQuery = query(
       collection(db, 'extendDateRequests'),
       where('ownerId', '==', user.uid),
       where('status', '==', 'pending')
     );
     const unsubExtendRequests = onSnapshot(extendRequestsQuery, (snap) => {
-      const requests = snap.docs.map((d) => ({
-        id: d.id,
-        type: 'extendRequest',
-        ...d.data(),
-      }));
+      const requests = snap.docs.map((d) => ({ id: d.id, type: 'extendRequest', ...d.data() }));
       notifs.push(...requests);
       updateNotifications();
     });
 
-    // Listen for items I'm borrowing that are overdue
     const itemsQuery = query(
       collection(db, 'items'),
       where('holderId', '==', user.uid),
@@ -88,22 +70,14 @@ export default function Navbar() {
         if (data.borrowedUntil) {
           const dueDate = dayjs(data.borrowedUntil);
           const daysUntilDue = dueDate.diff(now, 'day');
-          // Only show notification if overdue (past the return date)
           if (daysUntilDue < 0) {
-            notifs.push({
-              id: d.id,
-              type: 'overdue',
-              itemTitle: data.title,
-              dueDate: data.borrowedUntil,
-              ownerId: data.ownerId,
-            });
+            notifs.push({ id: d.id, type: 'overdue', itemTitle: data.title, dueDate: data.borrowedUntil, ownerId: data.ownerId });
           }
         }
       });
       updateNotifications();
     });
 
-    // Listen for return notifications (items I own that were returned)
     const returnsQuery = query(
       collection(db, 'notifications'),
       where('ownerId', '==', user.uid),
@@ -111,11 +85,7 @@ export default function Navbar() {
       where('read', '==', false)
     );
     const unsubReturns = onSnapshot(returnsQuery, (snap) => {
-      const arr = snap.docs.map((d) => ({
-        id: d.id,
-        type: 'return',
-        ...d.data(),
-      }));
+      const arr = snap.docs.map((d) => ({ id: d.id, type: 'return', ...d.data() }));
       notifs.push(...arr);
       updateNotifications();
     });
@@ -133,7 +103,6 @@ export default function Navbar() {
     };
   }, [user]);
 
-  // Track scroll to apply drop shadow when sticky
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 0);
     onScroll();
@@ -144,22 +113,15 @@ export default function Navbar() {
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
+  const handleMenuClose = () => setAnchorEl(null);
 
   const handleNotificationClick = (notification: any) => {
     handleMenuClose();
-    if (
-      notification.type === 'borrowRequest' ||
-      notification.type === 'extendRequest'
-    ) {
+    if (notification.type === 'borrowRequest' || notification.type === 'extendRequest') {
       navigate(`/item/${notification.itemId}`);
     } else if (notification.type === 'overdue') {
       navigate(`/item/${notification.id}`);
     } else if (notification.type === 'return') {
-      // Mark as read and navigate to item
       try {
         updateDoc(doc(db, 'notifications', notification.id), { read: true });
       } catch {}
@@ -169,13 +131,9 @@ export default function Navbar() {
 
   const getInitials = (name?: string | null) => {
     if (!name) return '?';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
   return (
     <AppBar
       position='sticky'
@@ -183,41 +141,45 @@ export default function Navbar() {
       elevation={0}
       sx={{
         top: 0,
-        bgcolor: ui.bg,
+        background:
+          `radial-gradient(900px 600px at 10% -10%, rgba(139,227,106,.08), transparent 40%), radial-gradient(800px 500px at 110% 40%, rgba(123,220,255,.06), transparent 40%), #0f1115`,
         borderBottom: `1px solid ${ui.border}`,
         boxShadow: scrolled ? '0 6px 18px rgba(0,0,0,0.35)' : 'none',
         backdropFilter: scrolled ? 'saturate(120%)' : 'none',
         borderRadius: 0,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
         zIndex: (theme) => theme.zIndex.appBar,
       }}
     >
       <Toolbar sx={{ justifyContent: 'center', py: 1 }}>
         <Box
           sx={{
-            width: 1000,
-            maxWidth: '100%',
+            width: '100%',
+            maxWidth: 1100,
             mx: 'auto',
+            px: { xs: 2, sm: 3 },
             display: 'flex',
             alignItems: 'center',
             gap: 2,
           }}
         >
-          {/* Brand */}
           <Typography
             variant='h4'
             component={RouterLink}
             to='/'
-            sx={{ textDecoration: 'none', color: ui.primary, fontWeight: 800 }}
+            sx={{
+              textDecoration: 'none',
+              fontWeight: 800,
+              background: 'linear-gradient(90deg,#6bd6ff,#7f8cff)',
+              WebkitBackgroundClip: 'text',
+              color: 'transparent',
+              letterSpacing: '.5px',
+            }}
           >
             BORO
           </Typography>
 
-          {/* Spacer */}
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* Right actions */}
           <Stack direction='row' spacing={2} alignItems='center'>
             {user ? (
               <>
@@ -225,12 +187,13 @@ export default function Navbar() {
                   <Badge badgeContent={notificationCount} color='error'>
                     <Avatar
                       sx={{
-                        width: 32,
-                        height: 32,
-                        bgcolor: alpha(ui.primary, 0.12),
-                        color: ui.primary,
+                        width: 36,
+                        height: 36,
+                        bgcolor: `${ACCENTS.people}44`,
+                        color: '#fff',
                         fontWeight: 700,
-                        fontSize: 12,
+                        fontSize: 13,
+                        border: `1px solid ${ACCENTS.people}66`,
                       }}
                     >
                       {getInitials(user.displayName || user.email)}
@@ -240,42 +203,30 @@ export default function Navbar() {
                 <Button
                   onClick={signOutUser}
                   sx={{
-                    bgcolor: ui.neutral,
-                    color: ui.text,
+                    bgcolor: '#1a2130',
+                    border: '1px solid #2a3144',
+                    color: '#e8efff',
                     textTransform: 'none',
-                    borderRadius: 9999,
-                    border: `1px solid ${ui.border}`,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    borderRadius: '999px',
                     px: 1.75,
-                    '&:hover': { bgcolor: '#353A42', borderColor: ui.border },
+                    minHeight: 34,
+                    '&:hover': { bgcolor: '#20283a' },
                   }}
                 >
                   Sign out
                 </Button>
-                <Menu
-                  anchorEl={anchorEl}
-                  open={Boolean(anchorEl)}
-                  onClose={handleMenuClose}
-                >
+                <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                   {notifications.length === 0 ? (
                     <MenuItem disabled>No notifications</MenuItem>
                   ) : (
                     notifications.map((notif, idx) => (
-                      <MenuItem
-                        key={`${notif.id}-${idx}`}
-                        onClick={() => handleNotificationClick(notif)}
-                      >
-                        {notif.type === 'borrowRequest' &&
-                          `New borrow request from ${notif.requesterName}`}
-                        {notif.type === 'extendRequest' &&
-                          `Extend date request from ${notif.requesterName}`}
-                        {notif.type === 'overdue' &&
-                          `Overdue: ${notif.itemTitle} (Due: ${new Date(
-                            notif.dueDate
-                          ).toLocaleDateString()})`}
-                        {notif.type === 'return' &&
-                          `${notif.borrowerName || 'Someone'} returned ${
-                            notif.itemTitle
-                          }`}
+                      <MenuItem key={`${notif.id}-${idx}`} onClick={() => handleNotificationClick(notif)}>
+                        {notif.type === 'borrowRequest' && `New borrow request from ${notif.requesterName}`}
+                        {notif.type === 'extendRequest' && `Extend date request from ${notif.requesterName}`}
+                        {notif.type === 'overdue' && `Overdue: ${notif.itemTitle} (Due: ${new Date(notif.dueDate).toLocaleDateString()})`}
+                        {notif.type === 'return' && `${notif.borrowerName || 'Someone'} returned ${notif.itemTitle}`}
                       </MenuItem>
                     ))
                   )}
@@ -288,9 +239,9 @@ export default function Navbar() {
                 variant='contained'
                 onClick={signInWithGoogle}
                 sx={{
-                  bgcolor: ui.primary,
+                  background: 'linear-gradient(180deg,#9cf07c,#62d24b)',
                   color: '#0A0A0A',
-                  '&:hover': { bgcolor: ui.primaryHover },
+                  '&:hover': { filter: 'brightness(1.06)' },
                   textTransform: 'none',
                 }}
               >
