@@ -719,15 +719,43 @@ export default function Home2() {
                   ),
                 }}
                 sx={{
+                  // base input container
                   '& .MuiOutlinedInput-root': {
                     bgcolor: '#141a26',
                     borderRadius: 2,
+                    // ensure native focus outline doesn't show
+                    outline: 'none',
                   },
+                  // hide the default notched outline so we can draw our own gradient border
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#273146',
+                    borderColor: 'transparent',
+                    // make sure any stronger rules (error / theme) are overridden
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    // use !important to beat MUI runtime focus rules
+                    // (sx doesn't support !important directly on values, so we add a selector below)
                   },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#33405a',
+                  '&:hover .MuiOutlinedInput-root': {
+                    // subtle hover tint
+                    background: '#161a22',
+                  },
+                  // focused state: blue gradient border
+                  '& .MuiOutlinedInput-root.Mui-focused': {
+                    background: 'linear-gradient(#141a26,#141a26) padding-box, linear-gradient(90deg,#6bd6ff,#7f8cff) border-box',
+                    border: '1px solid transparent',
+                    // ensure our gradient-border rendering is respected
+                    WebkitBackgroundClip: 'padding-box, border-box',
+                    backgroundClip: 'padding-box, border-box',
+                    // fallback subtle blue halo in case the gradient border isn't applied
+                    boxShadow: '0 0 0 3px rgba(127,140,255,0.10)',
+                  },
+                  // stronger selector to override MUI's focused-notchedOutline rule (which can set primary/error color)
+                  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'transparent !important',
+                  },
+                  // remove any native focus outlines on the input element itself
+                  '& .MuiOutlinedInput-input': {
+                    '&:focus': { outline: 'none !important', boxShadow: 'none !important' },
                   },
                 }}
               />
