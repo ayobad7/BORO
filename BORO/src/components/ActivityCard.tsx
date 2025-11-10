@@ -1,12 +1,23 @@
 import Box from '@mui/material/Box';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
-import { Link as RouterLink } from 'react-router-dom';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import type { StorageItem } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { updateDoc, doc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { BiCategoryAlt } from 'react-icons/bi';
 import { GrLocation } from 'react-icons/gr';
 import { PiHandArrowDown, PiTimerBold } from 'react-icons/pi';
@@ -41,7 +52,16 @@ export default function ActivityCard({
   viewerIsOwner,
   viewerId = null,
 }: ActivityCardProps) {
+  const navigate = useNavigate();
   const [copiedOpen, setCopiedOpen] = useState(false);
+
+  const { user } = useAuth();
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendToDate, setExtendToDate] = useState<Dayjs | null>(null);
+  const [extendMessage, setExtendMessage] = useState('');
+  const [extendSaving, setExtendSaving] = useState(false);
+  const [extendDateTouched, setExtendDateTouched] = useState(false);
+  const isBorrower = useMemo(() => !!(user && item && item.status === 'borrowed' && user.uid === item.holderId), [user, item]);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,8 +173,31 @@ export default function ActivityCard({
   };
 
   // Resolve viewer relationship to this item. Priority: explicit viewerIsOwner prop, else derive from viewerId. Default: true (owner) to preserve existing behavior.
-  const resolvedViewerIsOwner = typeof viewerIsOwner === 'boolean' ? viewerIsOwner : (viewerId ? viewerId === item.ownerId : true);
-  const resolvedViewerIsHolder = viewerId ? viewerId === item.holderId : false;
+  // Resolve owner/holder using string coercion to avoid mismatches between undefined/null or different types
+  const resolvedViewerIsOwner =
+    typeof viewerIsOwner === 'boolean'
+      ? viewerIsOwner
+      : viewerId != null
+      ? String(viewerId) === String(item.ownerId)
+      : true;
+  const resolvedViewerIsHolder =
+    viewerId != null && item.holderId != null
+      ? String(viewerId) === String(item.holderId)
+      : false;
+
+  // Debug: log viewer/item relation for borrowed cards (kept lightweight)
+  if ((import.meta as any).env?.MODE !== 'production' && type === 'borrowed') {
+    // eslint-disable-next-line no-console
+    console.debug('ActivityCard debug:', {
+      id: item.id,
+      viewerId,
+      holderId: item.holderId,
+      ownerId: item.ownerId,
+      resolvedViewerIsOwner,
+      resolvedViewerIsHolder,
+      type,
+    });
+  }
 
   return (
     <Box
@@ -474,10 +517,10 @@ export default function ActivityCard({
             
             {/* Action buttons */}
             <Box sx={{ display: 'flex', gap: 0.75 }}>
-              {type === 'borrowed' && (
+                  {type === 'borrowed' && (
                 <>
-                  {/* Borrower actions: only show if the viewer is the current holder */}
-                  {resolvedViewerIsHolder && (
+                  {/* Borrower actions: show when card type is 'borrowed' (implies holder in feeds) or when resolvedViewerIsHolder is true */}
+                  {(type === 'borrowed' || resolvedViewerIsHolder) && (
                     <>
                       <Button
                         variant='outlined'
@@ -485,6 +528,15 @@ export default function ActivityCard({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          // open in-place extend modal (preferred) if viewer is borrower; otherwise navigate to item
+                          if (isBorrower) {
+                            setExtendDialogOpen(true);
+                            // prefill min date but mark as not touched so the user must actively pick a new date
+                            setExtendToDate(item.borrowedUntil ? dayjs(item.borrowedUntil).add(1, 'day') : dayjs().add(1, 'day'));
+                            setExtendDateTouched(false);
+                          } else {
+                            navigate(`/item/${item.id}?extend=1`);
+                          }
                         }}
                         sx={{
                           borderColor: '#2a3144',
@@ -503,6 +555,8 @@ export default function ActivityCard({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          // Navigate to item detail and open return flow (owner/borrower confirms on item page)
+                          navigate(`/item/${item.id}?return=1`);
                         }}
                         sx={{
                           bgcolor: accentColor,
@@ -621,6 +675,124 @@ export default function ActivityCard({
           </Box>
         }
       />
+      {/* Extend Dialog (in-place) */}
+      <Dialog
+        open={extendDialogOpen}
+        // Stop propagation on close events so backdrop clicks don't bubble to the card link
+  onClose={(e?: {}) => {
+          try {
+            // try to stop propagation if an event is available
+            // @ts-ignore
+            e?.stopPropagation?.();
+          } catch (_) {}
+          setExtendDialogOpen(false);
+          // reset touched state and selected date when closing the dialog
+          setExtendDateTouched(false);
+          setExtendToDate(null);
+        }}
+        maxWidth='xs'
+        // Prevent clicks inside the dialog (portal) from bubbling to the card's RouterLink
+        PaperProps={{
+          onClick: (e: React.MouseEvent) => e.stopPropagation(),
+          onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+        }}
+        BackdropProps={{
+          onClick: (e: React.MouseEvent) => e.stopPropagation(),
+          onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+          onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+        }}
+      >
+        <DialogTitle>Extend Return Date</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 1, display: 'grid', gap: 2 }}>
+            {item.borrowedUntil && (
+              <Typography variant='body2' color='text.secondary'>
+                Current return date: {new Date(item.borrowedUntil).toLocaleDateString()}
+              </Typography>
+            )}
+            <Box
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+              onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
+            >
+              <DatePicker
+                label='New return date'
+                value={extendToDate}
+                onChange={(d) => {
+                  setExtendToDate(d);
+                  setExtendDateTouched(true);
+                }}
+                minDate={item.borrowedUntil ? dayjs(item.borrowedUntil).add(1, 'day') : dayjs()}
+              />
+            </Box>
+            {item.borrowMode === 'request' && (
+              <TextField
+                label='Reason (optional)'
+                value={extendMessage}
+                onChange={(e) => setExtendMessage(e.target.value)}
+                multiline
+                minRows={2}
+                helperText='Owner approval required for request mode items'
+              />
+            )}
+            {item.borrowMode === 'free' && (
+              <Typography variant='body2' color='text.secondary'>
+                Free mode: date will update immediately
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={(e) => { e.stopPropagation(); setExtendDialogOpen(false); setExtendDateTouched(false); setExtendToDate(null); }}>Cancel</Button>
+          <Button
+            variant='contained'
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!extendToDate) return;
+              setExtendSaving(true);
+              try {
+                if (item.borrowMode === 'free') {
+                  await updateDoc(doc(db, 'items', item.id), {
+                    borrowedUntil: extendToDate.toISOString(),
+                    updatedAt: serverTimestamp(),
+                  });
+                } else {
+                  const reqId = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+                  const req: any = {
+                    id: reqId,
+                    itemId: item.id,
+                    ownerId: item.ownerId,
+                    requesterId: user?.uid,
+                    requesterName: user?.displayName || user?.email || 'Unknown',
+                    currentToDate: item.borrowedUntil || '',
+                    requestedToDate: extendToDate.toISOString(),
+                    message: extendMessage.trim() || undefined,
+                    status: 'pending',
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                  };
+                  await setDoc(doc(collection(db, 'extendDateRequests'), reqId), {
+                    ...req,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                  });
+                }
+                setExtendDialogOpen(false);
+                setExtendToDate(null);
+                setExtendMessage('');
+                setExtendDateTouched(false);
+              } catch (e) {
+                console.error('Extend failed', e);
+              } finally {
+                setExtendSaving(false);
+              }
+            }}
+            disabled={extendSaving || !extendToDate || !extendDateTouched}
+          >
+            {extendSaving ? 'Submitting…' : item.borrowMode === 'free' ? 'Update Date' : 'Request Extension'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

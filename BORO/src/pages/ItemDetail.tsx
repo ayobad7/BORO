@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import { useParams, Link as RouterLink, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
@@ -55,6 +55,7 @@ export default function ItemDetail() {
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendToDate, setExtendToDate] = useState<Dayjs | null>(null);
   const [extendMessage, setExtendMessage] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (!id) return;
@@ -378,6 +379,22 @@ export default function ItemDetail() {
       setSaving(false);
     }
   };
+
+  // Open extend dialog when URL contains ?extend=1
+  useEffect(() => {
+    if (searchParams.get('extend')) {
+      setExtendDialogOpen(true);
+    }
+  }, [searchParams]);
+
+  // Clear ?extend param when dialog closes
+  useEffect(() => {
+    if (!extendDialogOpen && searchParams.get('extend')) {
+      const sp = new URLSearchParams(searchParams as any);
+      sp.delete('extend');
+      setSearchParams(sp);
+    }
+  }, [extendDialogOpen, searchParams]);
 
   const approveExtendRequest = async (req: ExtendDateRequest) => {
     if (!item || !isOwner) return;
