@@ -17,7 +17,12 @@ import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import type { BorrowMode } from '../types';
 
-export default function QuickAddCard({ className }: { className?: string }) {
+interface QuickAddCardProps {
+  className?: string;
+  onItemAdded?: () => void;
+}
+
+export default function QuickAddCard({ className, onItemAdded }: QuickAddCardProps) {
   const { user } = useAuth();
 
   // Mirror Home.tsx quick add state/behavior exactly
@@ -109,7 +114,13 @@ export default function QuickAddCard({ className }: { className?: string }) {
       setQCategory('');
       setQLocation('');
       setQNote('');
+      setQMode('free');
       setQFiles([]);
+      
+      // Notify parent component that item was added
+      if (onItemAdded) {
+        onItemAdded();
+      }
     } catch (e) {
       console.error(e);
     } finally {

@@ -41,6 +41,7 @@ export default function PublicStorage() {
   const [favoriteId, setFavoriteId] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [favItemIds, setFavItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!userId) return;
@@ -118,6 +119,24 @@ export default function PublicStorage() {
     localStorage.setItem('storageHistory', JSON.stringify(history));
   }, [userId, ownerName, user?.uid]);
 
+  // Listen for favorite items for current user so PublicStorage can show heart state
+  useEffect(() => {
+    if (!user) {
+      setFavItemIds(new Set());
+      return;
+    }
+    const fq = query(collection(db, 'favoriteItems'), where('userId', '==', user.uid));
+    const unsub = onSnapshot(fq, (snap) => {
+      const ids = new Set<string>();
+      for (const d of snap.docs) {
+        const data = d.data() as any;
+        if (data.itemId) ids.add(data.itemId as string);
+      }
+      setFavItemIds(ids);
+    });
+    return () => unsub();
+  }, [user]);
+
   // Check if this storage is favorited
   useEffect(() => {
     if (!user || !userId || userId === user.uid) return;
@@ -142,7 +161,7 @@ export default function PublicStorage() {
     checkFavorite();
   }, [user, userId]);
 
-  const toggleFavorite = async () => {
+  const toggleStorageFavorite = async () => {
     if (!user || !userId || !ownerName) return;
 
     try {
@@ -176,6 +195,33 @@ export default function PublicStorage() {
       console.error('Failed to toggle favorite:', e);
       setSnackbarMessage('Failed to update favorites');
       setSnackbarOpen(true);
+    }
+  };
+
+  // Toggle favorite for an item (optimistic update + Firestore write)
+  const toggleItemFavorite = async (id: string) => {
+    if (!user) return;
+    const wasFav = favItemIds.has(id);
+    // optimistic
+    setFavItemIds((prev) => {
+      const next = new Set(prev);
+      if (wasFav) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    try {
+      const favRef = doc(collection(db, 'favoriteItems'), `${user.uid}_${id}`);
+      if (wasFav) {
+        await deleteDoc(favRef);
+      } else {
+        await setDoc(favRef, {
+          userId: user.uid,
+          itemId: id,
+          createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      console.error('Favorite toggle failed', e);
     }
   };
 
@@ -255,7 +301,7 @@ export default function PublicStorage() {
                 startIcon={
                   isFavorited ? <FavoriteIcon /> : <FavoriteBorderIcon />
                 }
-                onClick={toggleFavorite}
+                onClick={toggleStorageFavorite}
               >
                 {isFavorited ? 'Favorited' : 'Add to Favorites'}
               </Button>
@@ -299,6 +345,8 @@ export default function PublicStorage() {
                     accentColor={accent}
                     viewerIsOwner={viewerIsOwner}
                     viewerId={viewerIdVal}
+                    isFavorite={favItemIds.has(it.id)}
+                    onToggleFavorite={() => toggleItemFavorite(it.id)}
                   />
                 );
               })}
