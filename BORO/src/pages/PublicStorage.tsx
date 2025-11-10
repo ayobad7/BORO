@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardActionArea from '@mui/material/CardActionArea';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Button from '@mui/material/Button';
@@ -28,8 +24,11 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import type { StorageItem, StorageHistory, FavoriteStorage } from '../types';
-import { Link as RouterLink } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+import ActivityCard from '../components/ActivityCard';
+import { ACCENTS } from '../lib/accents';
+import Masonry from 'react-masonry-css';
+import './Home2.css';
 
 export default function PublicStorage() {
   const { userId } = useParams();
@@ -52,14 +51,32 @@ export default function PublicStorage() {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const arr = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        })) as StorageItem[];
-        setItems(arr);
+        const toMs = (v: any) => {
+          if (!v) return 0;
+          if (typeof v === 'number') return v;
+          if (typeof v === 'string') {
+            const n = Date.parse(v);
+            return isNaN(n) ? 0 : n;
+          }
+          if (v && typeof v.toMillis === 'function') return v.toMillis();
+          if (v instanceof Date) return v.getTime();
+          return 0;
+        };
+        const arr = snap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            id: d.id,
+            ...data,
+            createdAt: toMs(data.createdAt),
+            updatedAt: toMs(data.updatedAt),
+          } as StorageItem;
+        });
         if (arr.length > 0 && arr[0].ownerName) {
           setOwnerName(arr[0].ownerName);
         }
+        // sort newest first
+        arr.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+        setItems(arr);
         setLoading(false);
       },
       (e) => {
@@ -175,15 +192,7 @@ export default function PublicStorage() {
             justifyContent: 'center',
           }}
         >
-          <Box
-            sx={{
-              width: 1000,
-              maxWidth: '100%',
-              py: 3,
-              display: 'flex',
-              justifyContent: 'center',
-            }}
-          >
+          <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}>
             <CircularProgress />
           </Box>
         </Box>
@@ -204,7 +213,7 @@ export default function PublicStorage() {
             justifyContent: 'center',
           }}
         >
-          <Box sx={{ width: 1000, maxWidth: '100%', py: 3 }}>
+          <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}>
             <Alert severity='error'>{error}</Alert>
           </Box>
         </Box>
@@ -224,7 +233,7 @@ export default function PublicStorage() {
           justifyContent: 'center',
         }}
       >
-        <Box sx={{ width: 1000, maxWidth: '100%', py: 3 }}>
+  <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', px: { xs: 2, sm: 3 }, py: 3 }}>
           <Stack
             direction='row'
             spacing={2}
@@ -259,70 +268,41 @@ export default function PublicStorage() {
             </Alert>
           )}
 
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-              gap: 2,
-              mt: 2,
-            }}
-          >
-            {items.map((it) => (
-              <Card key={it.id}>
-                <CardActionArea component={RouterLink} to={`/item/${it.id}`}>
-                  <CardContent>
-                    <Typography variant='subtitle1'>{it.title}</Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      {it.category}
-                      {it.location ? ` • ${it.location}` : ''}
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        gap: 1,
-                        mt: 1,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <Chip size='small' label={`Mode: ${it.borrowMode}`} />
-                      {it.status === 'available' && (
-                        <Chip
-                          size='small'
-                          label='Available'
-                          color='success'
-                          variant='outlined'
-                        />
-                      )}
-                      {it.status === 'requested' && (
-                        <Chip size='small' label='Requested' color='info' />
-                      )}
-                      {it.status === 'borrowed' && (
-                        <Chip size='small' label='Borrowed' color='warning' />
-                      )}
-                    </Box>
-                    {it.status === 'borrowed' && it.holderName && (
-                      <Typography
-                        variant='body2'
-                        color='text.secondary'
-                        sx={{ mt: 1 }}
-                      >
-                        Borrowed by: {it.holderName}
-                      </Typography>
-                    )}
-                    {it.borrowedUntil && (
-                      <Typography
-                        variant='body2'
-                        color='text.secondary'
-                        sx={{ mt: 0.5 }}
-                      >
-                        Return by:{' '}
-                        {new Date(it.borrowedUntil).toLocaleDateString()}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </CardActionArea>
-              </Card>
-            ))}
+          <Box sx={{ mt: 2 }}>
+            <Masonry
+              breakpointCols={{ default: 4, 1400: 3, 1024: 2, 640: 1 }}
+              className='my-masonry-grid'
+              columnClassName='my-masonry-grid_column'
+            >
+              {items.map((it) => {
+                const viewerIdVal = user?.uid ?? null;
+                // Determine card type relative to the current viewer
+                // If item is borrowed:
+                // - show 'borrowed' to the current holder
+                // - show 'lent' to everyone else (including owner and other viewers)
+                // Otherwise show 'storage'
+                let cardType: 'storage' | 'borrowed' | 'lent' = 'storage';
+                if (it.status === 'borrowed') {
+                  if (viewerIdVal && it.holderId && viewerIdVal === it.holderId) {
+                    cardType = 'borrowed';
+                  } else {
+                    cardType = 'lent';
+                  }
+                }
+                const accent = cardType === 'borrowed' ? ACCENTS.borrowed : cardType === 'lent' ? ACCENTS.lent : ACCENTS.storage;
+                const viewerIsOwner = user?.uid === userId;
+                return (
+                  <ActivityCard
+                    key={it.id}
+                    item={it}
+                    type={cardType}
+                    accentColor={accent}
+                    viewerIsOwner={viewerIsOwner}
+                    viewerId={viewerIdVal}
+                  />
+                );
+              })}
+            </Masonry>
           </Box>
 
           <Snackbar
