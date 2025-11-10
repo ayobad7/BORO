@@ -41,6 +41,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDaysLeft, getOverdueDays } from '../lib/date';
 import Popover from '@mui/material/Popover';
 import { LuFilter } from 'react-icons/lu';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormLabel from '@mui/material/FormLabel';
 
 // Activity colors
 // Activity colors now centralized in ACCENTS
@@ -85,7 +89,7 @@ export default function Home2() {
   const [qCategory, setQCategory] = useState('');
   const [qLocation, setQLocation] = useState('');
   const [qNote, setQNote] = useState('');
-  const qMode: BorrowMode = 'free';
+  const [qMode, setQMode] = useState<BorrowMode>('free');
   const [qFiles, setQFiles] = useState<File[]>([]);
   const [qSaving, setQSaving] = useState(false);
 
@@ -1256,6 +1260,34 @@ export default function Home2() {
                             },
                         }}
                       />
+                      {/* Borrow mode selection (Grab / Request) - mirror ItemForm */}
+                      <Box sx={{ minHeight: 54 }}>
+                        <FormLabel sx={{ color: '#a2b3c7', display: 'block', mb: 0.5 }}>Borrow mode</FormLabel>
+                        <RadioGroup
+                          row
+                          value={qMode}
+                          onChange={(_, v) => setQMode(v as BorrowMode)}
+                          sx={{ mb: 1, gap: 1 }}
+                        >
+                          <FormControlLabel
+                            value='free'
+                            control={<Radio size='small' sx={{ color: '#7f8cff', '&.Mui-checked': { color: '#7f8cff' } }} />}
+                            label='Grab'
+                          />
+                          <FormControlLabel
+                            value='request'
+                            control={<Radio size='small' sx={{ color: '#7f8cff', '&.Mui-checked': { color: '#7f8cff' } }} />}
+                            label='Request'
+                          />
+                        </RadioGroup>
+                        <Typography variant='body2' color='text.secondary' sx={{ mb: 1 }}>
+                          {qMode === 'free' ? (
+                            <><strong>Grab:</strong> Friends can borrow this item instantly without needing your approval.</>
+                          ) : (
+                            <><strong>Request:</strong> Friends must send a request and wait for your approval before borrowing.</>
+                          )}
+                        </Typography>
+                      </Box>
                       <Box sx={{ mt: 0.25 }}>
                         <Typography
                           variant='caption'
@@ -1302,6 +1334,7 @@ export default function Home2() {
                             setQCategory('');
                             setQLocation('');
                             setQNote('');
+                            setQMode('free');
                             setQFiles([]);
                           }}
                           sx={{
