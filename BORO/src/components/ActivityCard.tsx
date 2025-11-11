@@ -474,7 +474,7 @@ export default function ActivityCard({
           {type === 'storage' && (
             <Chip
               icon={item.borrowMode === 'free' ? <TbLockOpen size={11} /> : <TbLock size={11} />}
-              label={item.borrowMode === 'free' ? 'Free Borrow' : 'Request'}
+              label={item.borrowMode === 'free' ? 'Grab' : 'Request'}
               size='small'
               sx={{
                 height: 20,
