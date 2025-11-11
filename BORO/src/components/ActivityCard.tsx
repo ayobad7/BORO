@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { updateDoc, doc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import Tooltip from '@mui/material/Tooltip';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { BiCategoryAlt } from 'react-icons/bi';
@@ -26,6 +27,7 @@ import { LuShare2 } from 'react-icons/lu';
 import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai';
 import { TbLock, TbLockOpen } from 'react-icons/tb';
 import { getDaysLeft, getOverdueDays } from '../lib/date';
+import { buildReminderMessage } from '../lib/reminders';
 import { focusRing } from '../lib/accents';
 
 // Option A Revamp: Updated spacing, typography, and layout
@@ -54,14 +56,67 @@ export default function ActivityCard({
 }: ActivityCardProps) {
   const navigate = useNavigate();
   const [copiedOpen, setCopiedOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
 
   const { user } = useAuth();
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendToDate, setExtendToDate] = useState<Dayjs | null>(null);
   const [extendMessage, setExtendMessage] = useState('');
   const [extendSaving, setExtendSaving] = useState(false);
-  const [extendDateTouched, setExtendDateTouched] = useState(false);
+  const [returnSaving, setReturnSaving] = useState(false);
+  const [borrowDialogOpen, setBorrowDialogOpen] = useState(false);
+  const [borrowToDate, setBorrowToDate] = useState<Dayjs | null>(null);
+  const [borrowMessage, setBorrowMessage] = useState('');
+  const [borrowSaving, setBorrowSaving] = useState(false);
+  
   const isBorrower = useMemo(() => !!(user && item && item.status === 'borrowed' && user.uid === item.holderId), [user, item]);
+
+  const handleBorrowSubmit = async (e?: React.MouseEvent) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    // For free mode require a return date; for request mode a date is optional
+    if (item.borrowMode === 'free' && !borrowToDate) return;
+    setBorrowSaving(true);
+    try {
+      if (item.borrowMode === 'free') {
+        await updateDoc(doc(db, 'items', item.id), {
+          status: 'borrowed',
+          holderId: user?.uid,
+          holderName: user?.displayName || user?.email || 'Unknown',
+          borrowedFrom: serverTimestamp(),
+          borrowedUntil: borrowToDate!.toISOString(),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        const reqId = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+        const req: any = {
+          id: reqId,
+          itemId: item.id,
+          ownerId: item.ownerId,
+          requesterId: user?.uid,
+          requesterName: user?.displayName || user?.email || 'Unknown',
+          status: 'pending',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        if (borrowToDate) req.toDate = borrowToDate.toISOString();
+        if (borrowMessage.trim()) req.message = borrowMessage.trim();
+        await setDoc(doc(collection(db, 'borrowRequests'), reqId), req);
+        await updateDoc(doc(db, 'items', item.id), {
+          status: 'requested',
+          updatedAt: serverTimestamp(),
+        });
+      }
+      setBorrowDialogOpen(false);
+      setBorrowToDate(null);
+      setBorrowMessage('');
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Borrow failed', err);
+    } finally {
+      setBorrowSaving(false);
+    }
+  };
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -82,6 +137,87 @@ export default function ActivityCard({
     } catch (err) {
       // ignore copy errors
       setCopiedOpen(true);
+    }
+  };
+
+  const handleReturnClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // If the current viewer is the borrower, perform inline return. Otherwise, fall back to navigating to detail page.
+    if (!user || item.status !== 'borrowed' || user.uid !== item.holderId) {
+      navigate(`/item/${item.id}?return=1`);
+      return;
+    }
+    setReturnSaving(true);
+    try {
+      const ref = doc(db, 'items', item.id);
+      await updateDoc(ref, {
+        status: 'available',
+        holderId: item.ownerId,
+        holderName: null,
+        borrowedFrom: null,
+        borrowedUntil: null,
+        updatedAt: serverTimestamp(),
+      });
+      // Create a return notification for the owner
+      const nid = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+      await setDoc(doc(collection(db, 'notifications'), nid), {
+        id: nid,
+        type: 'return',
+        ownerId: item.ownerId,
+        itemId: item.id,
+        itemTitle: item.title,
+        borrowerId: user.uid,
+        borrowerName: user.displayName || user.email || 'Unknown',
+        read: false,
+        createdAt: serverTimestamp(),
+        returnedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Return failed', err);
+    } finally {
+      setReturnSaving(false);
+    }
+  };
+
+  const handleMarkReturned = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // If viewer is not owner or item not borrowed, fallback to detail page
+    if (!resolvedViewerIsOwner || item.status !== 'borrowed') {
+      navigate(`/item/${item.id}?return=1`);
+      return;
+    }
+    setReturnSaving(true);
+    try {
+      const ref = doc(db, 'items', item.id);
+      await updateDoc(ref, {
+        status: 'available',
+        holderId: item.ownerId,
+        holderName: null,
+        borrowedFrom: null,
+        borrowedUntil: null,
+        updatedAt: serverTimestamp(),
+      });
+      const nid = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+      await setDoc(doc(collection(db, 'notifications'), nid), {
+        id: nid,
+        type: 'return',
+        ownerId: item.ownerId,
+        itemId: item.id,
+        itemTitle: item.title,
+        borrowerId: item.holderId || null,
+        borrowerName: item.holderName || null,
+        read: false,
+        createdAt: serverTimestamp(),
+        returnedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Mark returned failed', err);
+    } finally {
+      setReturnSaving(false);
     }
   };
   // Compute due status string for borrowed/lent; returns value string or null
@@ -446,8 +582,33 @@ export default function ActivityCard({
               <Box>
                 <Button
                   size='small'
-                  variant={item.borrowMode === 'free' ? 'contained' : 'outlined'}
-                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                  variant='contained'
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setBorrowDialogOpen(true);
+                    setBorrowToDate(dayjs().add(7, 'day'));
+                    setBorrowMessage('');
+                  }}
+                  sx={{
+                    // Match Return button styling exactly to avoid height mismatch
+                    bgcolor: accentColor,
+                    color: '#0A0A0A',
+                    textTransform: 'none',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    px: 1.5,
+                    minHeight: 34,
+                    height: 34,
+                    lineHeight: '20px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                    '&:hover': { bgcolor: accentColor },
+                  }}
                 >
                   {item.borrowMode === 'free' ? 'Borrow' : 'Request borrow'}
                 </Button>
@@ -533,7 +694,6 @@ export default function ActivityCard({
                             setExtendDialogOpen(true);
                             // prefill min date but mark as not touched so the user must actively pick a new date
                             setExtendToDate(item.borrowedUntil ? dayjs(item.borrowedUntil).add(1, 'day') : dayjs().add(1, 'day'));
-                            setExtendDateTouched(false);
                           } else {
                             navigate(`/item/${item.id}?extend=1`);
                           }
@@ -552,12 +712,8 @@ export default function ActivityCard({
                       <Button
                         variant='contained'
                         size='small'
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          // Navigate to item detail and open return flow (owner/borrower confirms on item page)
-                          navigate(`/item/${item.id}?return=1`);
-                        }}
+                        onClick={handleReturnClick}
+                        disabled={returnSaving}
                         sx={{
                           bgcolor: accentColor,
                           color: '#0a0a0a',
@@ -565,10 +721,19 @@ export default function ActivityCard({
                           fontWeight: 800,
                           textTransform: 'none',
                           flex: 1,
+                          px: 1.5,
+                          minHeight: 34,
+                          height: 34,
+                          lineHeight: '20px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 2,
+                          boxSizing: 'border-box',
                           '&:hover': { bgcolor: accentColor },
                         }}
                       >
-                        Return
+                        {returnSaving ? 'Returning…' : 'Return'}
                       </Button>
                     </>
                   )}
@@ -579,31 +744,73 @@ export default function ActivityCard({
                   {/* Owner actions: only show if the viewer is the owner of the item */}
                   {resolvedViewerIsOwner && (
                     <>
-                      <Button
-                        variant='outlined'
-                        size='small'
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        sx={{
-                          borderColor: '#2a3144',
-                          color: accentColor,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textTransform: 'none',
-                          flex: 1,
-                        }}
-                      >
-                        Remind
-                      </Button>
+                          {(() => {
+                            const hasDue = !!item.borrowedUntil;
+                            const msUntil = hasDue ? new Date(String(item.borrowedUntil)).getTime() - Date.now() : Infinity;
+                            const canRemind = hasDue ? msUntil < 3 * 24 * 60 * 60 * 1000 : false;
+                            const tooltip = !hasDue
+                              ? 'No due date'
+                              : canRemind
+                              ? 'Remind borrower'
+                              : 'Remind available within 3 days of due date';
+
+                            return (
+                              <Tooltip title={tooltip}>
+                                <Button
+                                  variant='outlined'
+                                  size='small'
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!hasDue) return;
+                                    if (!canRemind) return;
+                                    try {
+                                      const msg = buildReminderMessage({
+                                        ownerName: item.ownerName,
+                                        itemName: item.title,
+                                        dueDate: item.borrowedUntil,
+                                      });
+                                      if (!msg) return;
+                                      const nid = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+                                      await setDoc(doc(collection(db, 'notifications'), nid), {
+                                        id: nid,
+                                        type: 'reminder',
+                                        ownerId: item.ownerId,
+                                        ownerName: item.ownerName || null,
+                                        borrowerId: item.holderId || null,
+                                        borrowerName: item.holderName || null,
+                                        itemId: item.id,
+                                        itemTitle: item.title,
+                                        message: msg,
+                                        read: false,
+                                        createdAt: serverTimestamp(),
+                                      });
+                                      setRemindOpen(true);
+                                    } catch (err) {
+                                      // eslint-disable-next-line no-console
+                                      console.error('Remind failed', err);
+                                    }
+                                  }}
+                                  disabled={!canRemind}
+                                  sx={{
+                                    borderColor: '#2a3144',
+                                    color: accentColor,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    flex: 1,
+                                    width: '100%',
+                                  }}
+                                >
+                                  Remind
+                                </Button>
+                              </Tooltip>
+                            );
+                          })()}
                       <Button
                         variant='contained'
                         size='small'
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
+                        onClick={handleMarkReturned}
                         sx={{
                           bgcolor: accentColor,
                           color: '#0a0a0a',
@@ -613,6 +820,7 @@ export default function ActivityCard({
                           flex: 1,
                           '&:hover': { bgcolor: accentColor },
                         }}
+                        disabled={returnSaving || item.status !== 'borrowed'}
                       >
                         Returned
                       </Button>
@@ -635,6 +843,44 @@ export default function ActivityCard({
           pointerEvents: 'none',
           '&:focus-visible + &': focusRing(`${accentColor}99`),
         }}
+      />
+      <Snackbar
+        open={remindOpen}
+        autoHideDuration={1800}
+        onClose={() => setRemindOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        ContentProps={{
+          sx: {
+            bgcolor: '#0f1318',
+            color: '#e9eef7',
+            border: '1px solid #23293a',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            borderRadius: '12px',
+            px: 1.5,
+            py: 0.7,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            minWidth: 180,
+            justifyContent: 'center',
+          },
+        }}
+        message={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'linear-gradient(90deg,#ffd06b,#ff9b6b)',
+                boxShadow: '0 2px 8px rgba(255,160,100,0.12) inset',
+              }}
+            />
+            <Typography variant='caption' sx={{ color: '#e9eef7', fontWeight: 700 }}>
+              Reminder sent
+            </Typography>
+          </Box>
+        }
       />
       {/* bottom-right badge removed in favor of inner image placement */}
       <Snackbar
@@ -676,6 +922,58 @@ export default function ActivityCard({
         }
       />
       {/* Extend Dialog (in-place) */}
+      {/* Borrow Dialog (in-card) */}
+      <Dialog
+        open={borrowDialogOpen}
+        // Stop propagation on close so backdrop clicks don't bubble to the card link
+        onClose={(e?: {}) => {
+          try {
+            // @ts-ignore
+            e?.stopPropagation?.();
+          } catch (_) {}
+          setBorrowDialogOpen(false);
+          setBorrowToDate(null);
+          setBorrowMessage('');
+        }}
+  maxWidth='xs'
+        // Prevent clicks inside the dialog (portal) and backdrop from bubbling to the card's RouterLink
+        PaperProps={{ onClick: (e: React.MouseEvent) => e.stopPropagation(), onMouseDown: (e: React.MouseEvent) => e.stopPropagation() }}
+        BackdropProps={{ onClick: (e: React.MouseEvent) => e.stopPropagation(), onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), onTouchStart: (e: React.TouchEvent) => e.stopPropagation() }}
+      >
+        <DialogTitle>
+          {item.borrowMode === 'free' ? 'Borrow Item' : 'Request to Borrow'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 1, display: 'grid', gap: 2 }}>
+            <DatePicker label='Return by' value={borrowToDate} onChange={setBorrowToDate} />
+            {item.borrowMode === 'request' && (
+              <TextField
+                label='Message (optional)'
+                value={borrowMessage}
+                onChange={(e) => setBorrowMessage(e.target.value)}
+                multiline
+                minRows={3}
+              />
+            )}
+            {item.borrowMode === 'free' && (
+              <Typography variant='body2' color='text.secondary'>
+                This item will be borrowed immediately.
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBorrowDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant='contained'
+            onClick={handleBorrowSubmit}
+            // For free mode require a date; for request mode allow empty date (matches ItemDetail behavior)
+            disabled={borrowSaving || (item.borrowMode === 'free' && !borrowToDate)}
+          >
+            {borrowSaving ? 'Submitting…' : item.borrowMode === 'free' ? 'Borrow Now' : 'Submit Request'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={extendDialogOpen}
         // Stop propagation on close events so backdrop clicks don't bubble to the card link
@@ -687,7 +985,7 @@ export default function ActivityCard({
           } catch (_) {}
           setExtendDialogOpen(false);
           // reset touched state and selected date when closing the dialog
-          setExtendDateTouched(false);
+          
           setExtendToDate(null);
         }}
         maxWidth='xs'
@@ -720,7 +1018,7 @@ export default function ActivityCard({
                 value={extendToDate}
                 onChange={(d) => {
                   setExtendToDate(d);
-                  setExtendDateTouched(true);
+                  
                 }}
                 minDate={item.borrowedUntil ? dayjs(item.borrowedUntil).add(1, 'day') : dayjs()}
               />
@@ -743,7 +1041,7 @@ export default function ActivityCard({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={(e) => { e.stopPropagation(); setExtendDialogOpen(false); setExtendDateTouched(false); setExtendToDate(null); }}>Cancel</Button>
+          <Button onClick={(e) => { e.stopPropagation(); setExtendDialogOpen(false); setExtendToDate(null); }}>Cancel</Button>
           <Button
             variant='contained'
             onClick={async (e) => {
@@ -758,7 +1056,7 @@ export default function ActivityCard({
                   });
                 } else {
                   const reqId = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
-                  const req: any = {
+                  const reqBase: any = {
                     id: reqId,
                     itemId: item.id,
                     ownerId: item.ownerId,
@@ -766,11 +1064,11 @@ export default function ActivityCard({
                     requesterName: user?.displayName || user?.email || 'Unknown',
                     currentToDate: item.borrowedUntil || '',
                     requestedToDate: extendToDate.toISOString(),
-                    message: extendMessage.trim() || undefined,
                     status: 'pending',
                     createdAt: Date.now(),
                     updatedAt: Date.now(),
                   };
+                  const req = extendMessage.trim() ? { ...reqBase, message: extendMessage.trim() } : reqBase;
                   await setDoc(doc(collection(db, 'extendDateRequests'), reqId), {
                     ...req,
                     createdAt: serverTimestamp(),
@@ -780,14 +1078,14 @@ export default function ActivityCard({
                 setExtendDialogOpen(false);
                 setExtendToDate(null);
                 setExtendMessage('');
-                setExtendDateTouched(false);
+                
               } catch (e) {
                 console.error('Extend failed', e);
               } finally {
                 setExtendSaving(false);
               }
             }}
-            disabled={extendSaving || !extendToDate || !extendDateTouched}
+            disabled={extendSaving || !extendToDate}
           >
             {extendSaving ? 'Submitting…' : item.borrowMode === 'free' ? 'Update Date' : 'Request Extension'}
           </Button>

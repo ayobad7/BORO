@@ -9,6 +9,10 @@ import { GrLocation } from 'react-icons/gr';
 import { BiCategoryAlt } from 'react-icons/bi';
 import { PiHandArrowUp, PiTimerBold } from 'react-icons/pi';
 import { ui, alpha } from '../../lib/uiTokens';
+import { db } from '../../lib/firebase';
+import { setDoc, collection, serverTimestamp, doc } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
+import { buildReminderMessage } from '../../lib/reminders';
 import MetaRow from '../MetaRow';
 import { getDaysLeft, getOverdueDays } from '../../lib/date';
 
@@ -207,7 +211,35 @@ export function LentSection({ items }: { items: StorageItem[] }) {
                 >
                   <Button
                     size='small'
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const hasDue = !!item.borrowedUntil;
+                      if (!hasDue) return;
+                      const msUntil = new Date(String(item.borrowedUntil)).getTime() - Date.now();
+                      const canRemind = msUntil < 3 * 24 * 60 * 60 * 1000;
+                      if (!canRemind) return;
+                      try {
+                        const msg = buildReminderMessage({ ownerName: item.ownerName, itemName: item.title, dueDate: item.borrowedUntil });
+                        if (!msg) return;
+                        const nid = uuidv4();
+                        await setDoc(doc(collection(db, 'notifications'), nid), {
+                          id: nid,
+                          type: 'reminder',
+                          ownerId: item.ownerId,
+                          ownerName: item.ownerName || null,
+                          borrowerId: item.holderId || null,
+                          borrowerName: item.holderName || null,
+                          itemId: item.id,
+                          itemTitle: item.title,
+                          message: msg,
+                          read: false,
+                          createdAt: serverTimestamp(),
+                        });
+                      } catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.error('Remind failed', err);
+                      }
+                    }}
                     sx={{
                       bgcolor: alpha(ui.primary, 0.12),
                       color: ui.primary,
@@ -217,6 +249,8 @@ export function LentSection({ items }: { items: StorageItem[] }) {
                       px: 1.5,
                       height: 32,
                       '&:hover': { bgcolor: alpha(ui.primary, 0.18) },
+                      flex: 1,
+                      width: '100%',
                     }}
                   >
                     Remind
@@ -233,6 +267,8 @@ export function LentSection({ items }: { items: StorageItem[] }) {
                       height: 32,
                       px: 1.5,
                       '&:hover': { bgcolor: ui.primaryHover },
+                      flex: 1,
+                      width: '100%',
                     }}
                   >
                     Mark Return

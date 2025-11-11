@@ -34,6 +34,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
+import { buildReminderMessage } from '../lib/reminders';
 import type { StorageItem, BorrowRequest, ExtendDateRequest } from '../types';
 
 export default function ItemDetail() {
@@ -55,6 +56,7 @@ export default function ItemDetail() {
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendToDate, setExtendToDate] = useState<Dayjs | null>(null);
   const [extendMessage, setExtendMessage] = useState('');
+  const [remindSent, setRemindSent] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -351,7 +353,7 @@ export default function ItemDetail() {
       } else {
         // Request mode: create extend request for owner approval
         const reqId = uuidv4();
-        const req: ExtendDateRequest = {
+        const reqBase: ExtendDateRequest = {
           id: reqId,
           itemId: item.id,
           ownerId: item.ownerId,
@@ -359,11 +361,14 @@ export default function ItemDetail() {
           requesterName: user.displayName || user.email || 'Unknown',
           currentToDate: item.borrowedUntil || '',
           requestedToDate: extendToDate.toISOString(),
-          message: extendMessage.trim() || undefined,
           status: 'pending',
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+        // Only include message if non-empty to avoid Firestore undefined field error
+        const req = extendMessage.trim()
+          ? { ...reqBase, message: extendMessage.trim() }
+          : reqBase;
         await setDoc(doc(collection(db, 'extendDateRequests'), reqId), {
           ...req,
           createdAt: serverTimestamp(),
@@ -566,6 +571,47 @@ export default function ItemDetail() {
                     {saving ? 'Saving…' : 'Mark returned'}
                   </Button>
                 )}
+                {isOwner && item.status === 'borrowed' && (
+                  (() => {
+                    const hasDue = !!item.borrowedUntil;
+                    const msUntil = hasDue ? new Date(String(item.borrowedUntil)).getTime() - Date.now() : Infinity;
+                    const canRemind = hasDue ? msUntil < 3 * 24 * 60 * 60 * 1000 : false;
+                    return (
+                      <Button
+                        variant='outlined'
+                        onClick={async () => {
+                          if (!canRemind) return;
+                          try {
+                            const msg = buildReminderMessage({ ownerName: item.ownerName, itemName: item.title, dueDate: item.borrowedUntil });
+                            if (!msg) return;
+                            const nid = uuidv4();
+                            await setDoc(doc(collection(db, 'notifications'), nid), {
+                              id: nid,
+                              type: 'reminder',
+                              ownerId: item.ownerId,
+                              ownerName: item.ownerName || null,
+                              borrowerId: item.holderId || null,
+                              borrowerName: item.holderName || null,
+                              itemId: item.id,
+                              itemTitle: item.title,
+                              message: msg,
+                              read: false,
+                              createdAt: serverTimestamp(),
+                            });
+                            setRemindSent(true);
+                            setTimeout(() => setRemindSent(false), 1800);
+                          } catch (err) {
+                            // eslint-disable-next-line no-console
+                            console.error('Remind failed', err);
+                          }
+                        }}
+                        disabled={!canRemind || saving}
+                      >
+                        Remind
+                      </Button>
+                    );
+                  })()
+                )}
                 {!isOwner && canFreeBorrow && (
                   <Button
                     variant='contained'
@@ -605,6 +651,13 @@ export default function ItemDetail() {
                   </>
                 )}
               </CardActions>
+              {remindSent && (
+                <Box sx={{ px: 2, pb: 1 }}>
+                  <Alert severity='success' onClose={() => setRemindSent(false)}>
+                    Reminder sent
+                  </Alert>
+                </Box>
+              )}
             </Card>
 
             {isOwner && pendingRequests.length > 0 && (

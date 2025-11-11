@@ -90,6 +90,19 @@ export default function Navbar() {
       updateNotifications();
     });
 
+    // Unread reminders targeted at the current user (borrower)
+    const remindersQuery = query(
+      collection(db, 'notifications'),
+      where('borrowerId', '==', user.uid),
+      where('type', '==', 'reminder'),
+      where('read', '==', false)
+    );
+    const unsubReminders = onSnapshot(remindersQuery, (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, type: 'reminder', ...d.data() }));
+      notifs.push(...arr);
+      updateNotifications();
+    });
+
     function updateNotifications() {
       setNotifications([...notifs]);
       setNotificationCount(notifs.length);
@@ -100,6 +113,7 @@ export default function Navbar() {
       unsubExtendRequests();
       unsubItems();
       unsubReturns();
+      unsubReminders && unsubReminders();
     };
   }, [user]);
 
@@ -122,6 +136,11 @@ export default function Navbar() {
     } else if (notification.type === 'overdue') {
       navigate(`/item/${notification.id}`);
     } else if (notification.type === 'return') {
+      try {
+        updateDoc(doc(db, 'notifications', notification.id), { read: true });
+      } catch {}
+      navigate(`/item/${notification.itemId}`);
+    } else if (notification.type === 'reminder') {
       try {
         updateDoc(doc(db, 'notifications', notification.id), { read: true });
       } catch {}
@@ -227,6 +246,10 @@ export default function Navbar() {
                         {notif.type === 'borrowRequest' && `New borrow request from ${notif.requesterName}`}
                         {notif.type === 'extendRequest' && `Extend date request from ${notif.requesterName}`}
                         {notif.type === 'overdue' && `Overdue: ${notif.itemTitle} (Due: ${new Date(notif.dueDate).toLocaleDateString()})`}
+                              {notif.type === 'reminder' && (
+                                // Prefer explicit message if set, fallback to compact summary
+                                notif.message ? `${notif.message}` : `Reminder: ${notif.itemTitle || ''}`
+                              )}
                         {notif.type === 'return' && `${notif.borrowerName || 'Someone'} returned ${notif.itemTitle}`}
                       </MenuItem>
                     ))
