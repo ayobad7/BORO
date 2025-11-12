@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Popover from '@mui/material/Popover';
 import type { BorrowMode } from '../../types';
+import { ACCENTS } from '../../lib/accents';
 
 interface FilterPopoverProps {
   filterAnchor: HTMLElement | null;
@@ -37,6 +38,41 @@ export default function FilterPopover({
   onToggleDueSoonOnly,
   onToggleShowPeople,
 }: FilterPopoverProps) {
+  // shared button styles
+  const restBtn: any = {
+    border: '1px solid #2a3144',
+    // force visual values to override theme styles
+    background: 'transparent !important',
+    backgroundColor: 'transparent !important',
+    color: '#a2b3c7 !important',
+    textTransform: 'none',
+    fontSize: 12,
+    fontWeight: 600,
+    borderRadius: '999px',
+    px: 1.4,
+    minHeight: 30,
+    '&:hover': { borderColor: '#3b465f', color: '#d1dbe6' },
+  };
+
+  const activeBtn: any = {
+    // force the 'borrow' style even if theme alters contained/outlined buttons
+    background: `${ACCENTS.storage} !important`,
+    backgroundColor: `${ACCENTS.storage} !important`,
+    color: '#0a0a0a !important',
+    textTransform: 'none',
+    fontSize: 12,
+    fontWeight: 800,
+    borderRadius: 2,
+    px: 1.5,
+    minHeight: 34,
+    height: 34,
+    lineHeight: '20px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxSizing: 'border-box',
+    '&:hover': { background: `${ACCENTS.storage} !important` },
+  };
   return (
     <Popover
       open={Boolean(filterAnchor)}
@@ -44,10 +80,13 @@ export default function FilterPopover({
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      sx={{
-        mt: 1,
-        '& .MuiPopover-paper': {
-          bgcolor: '#14171f',
+      sx={{ mt: 1 }}
+      PaperProps={{
+        // style + sx to be extra robust against theme overrides
+        style: { backgroundColor: '#141a26' },
+        sx: {
+          background: '#141a26 !important',
+          backgroundColor: '#141a26 !important',
           border: '1px solid #23293a',
           borderRadius: '20px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
@@ -78,18 +117,7 @@ export default function FilterPopover({
                 key={t.key}
                 size='small'
                 onClick={() => onToggleType(t.key)}
-                sx={{
-                  border: '1px solid #2a3144',
-                  bgcolor: typeFilters.has(t.key) ? '#20283a' : 'transparent',
-                  color: '#e8efff',
-                  textTransform: 'none',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  borderRadius: '999px',
-                  px: 1.4,
-                  minHeight: 30,
-                  '&:hover': { bgcolor: '#20283a' },
-                }}
+                sx={typeFilters.has(t.key) ? activeBtn : restBtn}
               >
                 {t.label}
               </Button>
@@ -97,18 +125,7 @@ export default function FilterPopover({
             <Button
               size='small'
               onClick={onToggleShowPeople}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: showPeople ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
+                sx={showPeople ? activeBtn : restBtn}
             >
               People
             </Button>
@@ -120,57 +137,20 @@ export default function FilterPopover({
             Status
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-            <Button
-              size='small'
-              onClick={onToggleFavOnly}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: favOnly ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
-            >
+            <Button size='small' onClick={onToggleFavOnly} sx={favOnly ? activeBtn : restBtn}>
               Favorites
             </Button>
             <Button
               size='small'
               onClick={onToggleOverdueOnly}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: overdueOnly ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
+              sx={overdueOnly ? activeBtn : restBtn}
             >
               Overdue
             </Button>
             <Button
               size='small'
               onClick={onToggleDueSoonOnly}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: dueSoonOnly ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
+              sx={dueSoonOnly ? activeBtn : restBtn}
             >
               Due soon
             </Button>
@@ -182,39 +162,13 @@ export default function FilterPopover({
             Borrow Mode
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-            <Button
-              size='small'
-              onClick={() => onToggleMode('free')}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: modeFilters.has('free') ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
-            >
+            <Button size='small' onClick={() => onToggleMode('free')} sx={modeFilters.has('free') ? activeBtn : restBtn}>
               Free
             </Button>
             <Button
               size='small'
               onClick={() => onToggleMode('request')}
-              sx={{
-                border: '1px solid #2a3144',
-                bgcolor: modeFilters.has('request') ? '#20283a' : 'transparent',
-                color: '#e8efff',
-                textTransform: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                borderRadius: '999px',
-                px: 1.4,
-                minHeight: 30,
-                '&:hover': { bgcolor: '#20283a' },
-              }}
+              sx={modeFilters.has('request') ? activeBtn : restBtn}
             >
               Request
             </Button>
