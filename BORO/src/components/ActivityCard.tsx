@@ -111,6 +111,9 @@ export default function ActivityCard({
           id: reqId,
           itemId: item.id,
           ownerId: item.ownerId,
+          // include item metadata to avoid extra fetches in the navbar
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
           requesterId: user?.uid,
           requesterName: user?.displayName || user?.email || 'Unknown',
           status: 'pending',
@@ -795,7 +798,7 @@ export default function ActivityCard({
                                       await setDoc(doc(collection(db, 'notifications'), nid), {
                                         id: nid,
                                         type: 'reminder',
-                                        ownerId: item.ownerId,
+                                        // Reminder is intended for the borrower only; do not set ownerId so owner won't receive it as a persisted notification
                                         ownerName: item.ownerName || null,
                                         borrowerId: item.holderId || null,
                                         borrowerName: item.holderName || null,
@@ -1081,6 +1084,9 @@ export default function ActivityCard({
                     id: reqId,
                     itemId: item.id,
                     ownerId: item.ownerId,
+                    // include item metadata to reduce later reads
+                    itemTitle: item.title,
+                    itemImage: item.imageUrls?.[0] || null,
                     requesterId: user?.uid,
                     requesterName: user?.displayName || user?.email || 'Unknown',
                     currentToDate: item.borrowedUntil || '',

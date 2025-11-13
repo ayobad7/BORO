@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -24,6 +26,8 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [clearedOpen, setClearedOpen] = useState(false);
+  const [clearedCount, setClearedCount] = useState(0);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
 
@@ -35,16 +39,36 @@ export default function Navbar() {
     }
 
     // Maintain separate arrays per source to avoid stale/duplicated accumulation
-    let borrowArr: any[] = [];
-    let extendArr: any[] = [];
-    let overdueArr: any[] = [];
-    let persistedArr: any[] = [];
-    let reminderArr: any[] = [];
+  let borrowArr: any[] = [];
+  let extendArr: any[] = [];
+  let overdueArr: any[] = [];
+  let persistedArr: any[] = [];
+  let reminderArr: any[] = [];
+  let requesterArr: any[] = [];
 
     const updateNotifications = () => {
-      const merged = [...borrowArr, ...extendArr, ...overdueArr, ...persistedArr, ...reminderArr];
-      setNotifications(merged);
-      setNotificationCount(merged.length);
+      const merged = [...borrowArr, ...extendArr, ...overdueArr, ...persistedArr, ...reminderArr, ...requesterArr];
+      // sort with overdue notifications prioritized, then newest-first by createdAt
+      const getMs = (n: any) => {
+        if (!n) return 0;
+        const c = n.createdAt;
+        if (!c) return 0;
+        if (typeof c === 'number') return c;
+        if (c?.toMillis) return c.toMillis();
+        if (typeof c === 'string') return new Date(c).getTime() || 0;
+        return 0;
+      };
+      const mergedSorted = merged.slice().sort((a: any, b: any) => {
+        // overdue gets higher priority
+        const pa = a?.type === 'overdue' ? 2 : 1;
+        const pb = b?.type === 'overdue' ? 2 : 1;
+        if (pa !== pb) return pb - pa; // overdue first
+        const ma = getMs(a) || 0;
+        const mb = getMs(b) || 0;
+        return mb - ma; // newest first
+      });
+      setNotifications(mergedSorted);
+      setNotificationCount(mergedSorted.length);
     };
 
     const borrowRequestsQuery = query(
@@ -99,6 +123,17 @@ export default function Navbar() {
       updateNotifications();
     });
 
+    // Notifications specifically addressed to the requester (approve/reject messages)
+    const requesterQuery = query(
+      collection(db, 'notifications'),
+      where('requesterId', '==', user.uid),
+      where('read', '==', false)
+    );
+    const unsubRequester = onSnapshot(requesterQuery, (snap) => {
+      requesterArr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      updateNotifications();
+    });
+
     // Unread reminders targeted at the current user (borrower)
     const remindersQuery = query(
       collection(db, 'notifications'),
@@ -117,6 +152,7 @@ export default function Navbar() {
       unsubItems();
       unsubPersisted();
       unsubReminders && unsubReminders();
+      unsubRequester && unsubRequester();
     };
   }, [user]);
 
@@ -282,22 +318,35 @@ export default function Navbar() {
                       <Button
                         size='small'
                         onClick={async () => {
-                          // Clear all non-request notifications (mark read for persisted notifications)
+                          // Clear all non-request notifications: mark the underlying
+                          // persisted notification documents as read so they won't
+                          // reappear from onSnapshot listeners. We intentionally
+                          // skip the in-flight request-type entries (borrow/extend
+                          // requests) which come from separate collections.
                           try {
                             const toClear = notifications.filter((n) => n.type !== 'borrowRequest' && n.type !== 'extendRequest');
+                            const toClearLen = toClear.length;
                             for (const n of toClear) {
-                              if (n.id && (n.type === 'return' || n.type === 'reminder' || n.type === 'grab')) {
+                              // If this notification was persisted in the notifications
+                              // collection (has an id), mark it read. This covers return,
+                              // reminder, grab, requestApproved, requestRejected, etc.
+                              if (n.id) {
                                 try {
                                   await updateDoc(doc(db, 'notifications', n.id), { read: true });
-                                } catch {}
+                                } catch (err) {
+                                  // ignore individual failures
+                                }
                               }
                             }
                             // locally remove non-request notifications
                             const remaining = notifications.filter((n) => n.type === 'borrowRequest' || n.type === 'extendRequest');
                             setNotifications(remaining);
                             setNotificationCount(remaining.length);
+                            // show confirmation snackbar with count
+                            setClearedCount(toClearLen);
+                            setClearedOpen(true);
                           } catch (e) {
-                            // ignore
+                            // ignore whole-operation failures
                           }
                         }}
                       sx={{ color: ACCENTS.storage }}
@@ -343,6 +392,20 @@ export default function Navbar() {
                           );
                         } else if (notif.type === 'reminder') {
                           primaryNode = notif.message ? notif.message : (<><Box component='span' sx={{ fontWeight: 800 }}>{notif.itemTitle || ''}</Box><Box component='span' sx={{ ml: 0.5 }}>reminder</Box></>);
+                        } else if (notif.type === 'requestApproved' || notif.type === 'requestRejected') {
+                          // Render approve/reject messages cleanly for requester
+                          if (typeof notif.message === 'string' && notif.message.trim()) {
+                            primaryNode = notif.message;
+                          } else {
+                            const verb = notif.type === 'requestApproved' ? 'approved' : 'rejected';
+                            primaryNode = (
+                              <>
+                                <Box component='span'>Your request for</Box>
+                                <Box component='span' sx={{ mx: 0.5, fontWeight: 800 }}>{notif.itemTitle || 'this item'}</Box>
+                                <Box component='span'>was {verb}.</Box>
+                              </>
+                            );
+                          }
                         } else if (notif.type === 'return' || notif.type === 'grab') {
                           primaryNode = (
                             <>
@@ -372,7 +435,7 @@ export default function Navbar() {
                           <Box key={`${notif.id}-${idx}`} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', p: 1.25, cursor: 'pointer' }} onClick={() => handleNotificationClick(notif)}>
                             {avatarContent}
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant='body2' sx={{ fontWeight: 700, display: 'block' }}>{primaryNode}</Typography>
+                              <Typography variant='body2' sx={{ fontWeight: 500, display: 'block', color: '#e9eef7' }}>{primaryNode}</Typography>
                               {secondary && <Typography variant='caption' sx={{ color: '#9ea9bf', display: 'block' }}>{secondary}</Typography>}
                             </Box>
                             {/* action area for request types */}
@@ -407,6 +470,11 @@ export default function Navbar() {
           </Stack>
         </Box>
       </Toolbar>
+        <Snackbar open={clearedOpen} autoHideDuration={3000} onClose={() => setClearedOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+          <Alert severity='success' onClose={() => setClearedOpen(false)} sx={{ width: '100%' }}>
+            {clearedCount > 0 ? `${clearedCount} notification${clearedCount === 1 ? '' : 's'} cleared` : 'No notifications cleared'}
+          </Alert>
+        </Snackbar>
     </AppBar>
   );
 }

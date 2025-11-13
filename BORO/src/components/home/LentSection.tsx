@@ -225,7 +225,7 @@ export function LentSection({ items }: { items: StorageItem[] }) {
                         await setDoc(doc(collection(db, 'notifications'), nid), {
                           id: nid,
                           type: 'reminder',
-                          ownerId: item.ownerId,
+                          // Target borrower only; omit ownerId so owner doesn't get their own sent reminder
                           ownerName: item.ownerName || null,
                           borrowerId: item.holderId || null,
                           borrowerName: item.holderName || null,

@@ -297,6 +297,9 @@ export default function ItemDetail() {
       const req: any = {
         id: reqId,
         itemId: item.id,
+        // include item metadata for consuming UI (avoid extra lookups)
+        itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
         ownerId: item.ownerId,
         requesterId: user.uid,
         requesterName: user.displayName || user.email || 'Unknown',
@@ -348,6 +351,24 @@ export default function ItemDetail() {
         borrowedUntil: req.toDate || null,
         updatedAt: serverTimestamp(),
       });
+      // Notify the requester that their borrow request was approved
+      try {
+        const notifId = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), notifId), {
+          id: notifId,
+          type: 'requestApproved',
+          requesterId: req.requesterId,
+          requesterName: req.requesterName || null,
+          itemId: item.id,
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
+          message: `Your borrow request for "${item.title}" was approved.`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        // ignore notification failure
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to approve');
     } finally {
@@ -367,6 +388,24 @@ export default function ItemDetail() {
         status: 'available',
         updatedAt: serverTimestamp(),
       });
+      // Notify the requester that their borrow request was rejected
+      try {
+        const notifId = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), notifId), {
+          id: notifId,
+          type: 'requestRejected',
+          requesterId: req.requesterId,
+          requesterName: req.requesterName || null,
+          itemId: item!.id,
+          itemTitle: item!.title,
+          itemImage: item!.imageUrls?.[0] || null,
+          message: `Your borrow request for "${item!.title}" was rejected.`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        // ignore
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to reject');
     } finally {
@@ -391,9 +430,12 @@ export default function ItemDetail() {
       } else {
         // Request mode: create extend request for owner approval
         const reqId = uuidv4();
-        const reqBase: ExtendDateRequest = {
+        const reqBase: any = {
           id: reqId,
           itemId: item.id,
+          // include item metadata so requester/owner UIs can show title/image without extra reads
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
           ownerId: item.ownerId,
           requesterId: user.uid,
           requesterName: user.displayName || user.email || 'Unknown',
@@ -451,6 +493,24 @@ export default function ItemDetail() {
         borrowedUntil: req.requestedToDate,
         updatedAt: serverTimestamp(),
       });
+      // Notify the requester that their extend request was approved
+      try {
+        const notifId = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), notifId), {
+          id: notifId,
+          type: 'requestApproved',
+          requesterId: req.requesterId,
+          requesterName: req.requesterName || null,
+          itemId: item.id,
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
+          message: `Your extension request for "${item.title}" was approved.`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        // ignore
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to approve extend');
     } finally {
@@ -466,6 +526,24 @@ export default function ItemDetail() {
         status: 'rejected',
         updatedAt: serverTimestamp(),
       });
+      // Notify the requester that their extend request was rejected
+      try {
+        const notifId = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), notifId), {
+          id: notifId,
+          type: 'requestRejected',
+          requesterId: req.requesterId,
+          requesterName: req.requesterName || null,
+          itemId: item!.id,
+          itemTitle: item!.title,
+          itemImage: item!.imageUrls?.[0] || null,
+          message: `Your extension request for "${item!.title}" was rejected.`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        // ignore
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to reject extend');
     } finally {
@@ -626,7 +704,7 @@ export default function ItemDetail() {
                             await setDoc(doc(collection(db, 'notifications'), nid), {
                               id: nid,
                               type: 'reminder',
-                              ownerId: item.ownerId,
+                              // Reminder should be delivered to borrower only; omit ownerId to prevent the owner from seeing the sent reminder
                               ownerName: item.ownerName || null,
                               borrowerId: item.holderId || null,
                               borrowerName: item.holderName || null,

@@ -40,6 +40,9 @@ export interface BorrowRequest {
   id: string;
   itemId: string;
   ownerId: string;
+  // optional cached item metadata to avoid extra lookups
+  itemTitle?: string;
+  itemImage?: string | null;
   requesterId: string;
   requesterName?: string;
   fromDate?: string; // ISO
@@ -53,6 +56,9 @@ export interface BorrowRequest {
 export interface ExtendDateRequest {
   id: string;
   itemId: string;
+  // optional cached item metadata to avoid extra lookups
+  itemTitle?: string;
+  itemImage?: string | null;
   ownerId: string;
   requesterId: string;
   requesterName?: string;
