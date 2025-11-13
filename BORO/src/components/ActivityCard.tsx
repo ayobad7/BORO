@@ -280,7 +280,7 @@ export default function ActivityCard({
       <Box sx={{ color: accentColor, display: 'flex', alignItems: 'center' }}>
         {icon}
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
+  <Box sx={{ display: 'flex', alignItems: 'baseline', minWidth: 0 }}>
         <Typography
           variant='caption'
           sx={{
@@ -293,22 +293,29 @@ export default function ActivityCard({
           {label}
         </Typography>
         {value && (
-          <Typography
-            variant='caption'
-            sx={{
-              ml: 1,
-              color: '#dfe6f3',
-              fontWeight: 700,
-              fontSize: 12,
-              lineHeight: 1.35,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: 260,
-            }}
-          >
-            {value}
-          </Typography>
+          (() => {
+            const maxChars = 120;
+            const singleLine = String(value).replace(/\s+/g, ' ').trim();
+            const display = singleLine.length > maxChars ? singleLine.slice(0, maxChars).trim() + '…' : singleLine;
+            return (
+              <Typography
+                variant='caption'
+                sx={{
+                  ml: 1,
+                  color: '#dfe6f3',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  lineHeight: 1.35,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 180,
+                }}
+              >
+                {display}
+              </Typography>
+            );
+          })()
         )}
       </Box>
     </Box>
@@ -401,14 +408,13 @@ export default function ActivityCard({
         >
           {item.imageUrls?.[0] ? (
             <Box
-              component='img'
-              src={item.imageUrls[0]}
-              alt={item.title || 'Item image'}
               sx={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
-                display: 'block',
+                backgroundImage: `url(${item.imageUrls[0]})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center center',
+                backgroundRepeat: 'no-repeat',
               }}
             />
           ) : null}

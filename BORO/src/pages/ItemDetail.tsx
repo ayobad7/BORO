@@ -6,9 +6,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import CardActions from '@mui/material/CardActions';
-import ImageList from '@mui/material/ImageList';
-import ImageListItem from '@mui/material/ImageListItem';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
@@ -21,7 +18,9 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { v4 as uuidv4 } from 'uuid';
+import { buildReminderMessage } from '../lib/reminders';
 import Navbar from '../components/Navbar';
+import ItemLayout from '../components/ItemLayout';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import {
@@ -34,7 +33,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { buildReminderMessage } from '../lib/reminders';
+
 import type { StorageItem, BorrowRequest, ExtendDateRequest } from '../types';
 
 export default function ItemDetail() {
@@ -56,7 +55,6 @@ export default function ItemDetail() {
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendToDate, setExtendToDate] = useState<Dayjs | null>(null);
   const [extendMessage, setExtendMessage] = useState('');
-  const [remindSent, setRemindSent] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -119,37 +117,10 @@ export default function ItemDetail() {
     [user, item]
   );
   const isBorrower = useMemo(
-    () =>
-      !!(
-        user &&
-        item &&
-        item.status === 'borrowed' &&
-        user.uid === item.holderId
-      ),
+    () => !!(user && item && item.status === 'borrowed' && user.uid === item.holderId),
     [user, item]
   );
-  const canFreeBorrow = useMemo(
-    () =>
-      !!(
-        user &&
-        item &&
-        !isOwner &&
-        item.borrowMode === 'free' &&
-        item.status === 'available'
-      ),
-    [user, item, isOwner]
-  );
-  const canRequestBorrow = useMemo(
-    () =>
-      !!(
-        user &&
-        item &&
-        !isOwner &&
-        item.borrowMode === 'request' &&
-        item.status === 'available'
-      ),
-    [user, item, isOwner]
-  );
+  
 
   const markReturned = async () => {
     if (!item || !isOwner) return;
@@ -465,6 +436,37 @@ export default function ItemDetail() {
     }
   };
 
+  const remindBorrower = async () => {
+    if (!item || !isOwner || !item.holderId) return;
+    // Build a human-friendly message (returns empty string if due not set)
+    const msg = buildReminderMessage({ ownerName: item.ownerName, itemName: item.title, dueDate: item.borrowedUntil });
+    if (!msg) {
+      setError('No return date set to base a reminder on.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const nid = uuidv4();
+      await setDoc(doc(collection(db, 'notifications'), nid), {
+        id: nid,
+        type: 'reminder',
+        // Target borrower only; omit ownerId so owner doesn't receive their own sent reminder
+        borrowerId: item.holderId,
+        borrowerName: item.holderName || null,
+        itemId: item.id,
+        itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
+        message: msg,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    } catch (e: any) {
+      setError(e.message || 'Failed to send reminder');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Open extend dialog when URL contains ?extend=1
   useEffect(() => {
     if (searchParams.get('extend')) {
@@ -629,153 +631,29 @@ export default function ItemDetail() {
             </Alert>
           )}
           <Stack spacing={2}>
-            <Typography variant='h5'>{item.title}</Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Category: {item.category}
-              {item.location ? ` • ${item.location}` : ''}
-            </Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Mode: {item.borrowMode} • Status: {item.status}
-            </Typography>
-            {item.description && (
-              <Typography variant='body1'>{item.description}</Typography>
-            )}
-
-            {item.imageUrls?.length ? (
-              <ImageList
-                cols={Math.min(3, item.imageUrls.length)}
-                rowHeight={180}
-              >
-                {item.imageUrls.map((url, idx) => (
-                  <ImageListItem key={idx}>
-                    <img
-                      src={url}
-                      loading='lazy'
-                      style={{
-                        objectFit: 'cover',
-                        width: '100%',
-                        height: '100%',
-                      }}
-                    />
-                  </ImageListItem>
-                ))}
-              </ImageList>
-            ) : (
-              <Typography color='text.secondary'>No images</Typography>
-            )}
-
-            <Card>
-              <CardContent>
-                <Typography variant='subtitle1'>Actions</Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {isOwner
-                    ? 'You are the owner of this item.'
-                    : 'You are viewing a shared item.'}
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <Button variant='outlined' component={RouterLink} to='/storage'>
-                  Back
-                </Button>
-                {isOwner && item.status === 'borrowed' && (
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    onClick={markReturned}
-                    disabled={saving}
-                  >
-                    {saving ? 'Saving…' : 'Mark returned'}
-                  </Button>
-                )}
-                {isOwner && item.status === 'borrowed' && (
-                  (() => {
-                    const hasDue = !!item.borrowedUntil;
-                    const msUntil = hasDue ? new Date(String(item.borrowedUntil)).getTime() - Date.now() : Infinity;
-                    const canRemind = hasDue ? msUntil < 3 * 24 * 60 * 60 * 1000 : false;
-                    return (
-                      <Button
-                        variant='outlined'
-                        onClick={async () => {
-                          if (!canRemind) return;
-                          try {
-                            const msg = buildReminderMessage({ ownerName: item.ownerName, itemName: item.title, dueDate: item.borrowedUntil });
-                            if (!msg) return;
-                            const nid = uuidv4();
-                            await setDoc(doc(collection(db, 'notifications'), nid), {
-                              id: nid,
-                              type: 'reminder',
-                              // Reminder should be delivered to borrower only; omit ownerId to prevent the owner from seeing the sent reminder
-                              ownerName: item.ownerName || null,
-                              borrowerId: item.holderId || null,
-                              borrowerName: item.holderName || null,
-                              itemId: item.id,
-                              itemTitle: item.title,
-                              itemImage: item.imageUrls?.[0] || null,
-                              message: msg,
-                              read: false,
-                              createdAt: serverTimestamp(),
-                            });
-                            setRemindSent(true);
-                            setTimeout(() => setRemindSent(false), 1800);
-                          } catch (err) {
-                            // eslint-disable-next-line no-console
-                            console.error('Remind failed', err);
-                          }
-                        }}
-                        disabled={!canRemind || saving}
-                      >
-                        Remind
-                      </Button>
-                    );
-                  })()
-                )}
-                {!isOwner && canFreeBorrow && (
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    onClick={() => setBorrowDialogOpen(true)}
-                    disabled={!user}
-                  >
-                    Borrow now
-                  </Button>
-                )}
-                {!isOwner && canRequestBorrow && (
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    onClick={() => setBorrowDialogOpen(true)}
-                    disabled={!user}
-                  >
-                    Request borrow
-                  </Button>
-                )}
-                {isBorrower && (
-                  <>
-                    <Button
-                      variant='outlined'
-                      onClick={() => setExtendDialogOpen(true)}
-                    >
-                      Extend date
-                    </Button>
-                    <Button
-                      variant='contained'
-                      color='error'
-                      onClick={returnItem}
-                      disabled={saving}
-                    >
-                      {saving ? 'Returning…' : 'Return'}
-                    </Button>
-                  </>
-                )}
-              </CardActions>
-              {remindSent && (
-                <Box sx={{ px: 2, pb: 1 }}>
-                  <Alert severity='success' onClose={() => setRemindSent(false)}>
-                    Reminder sent
-                  </Alert>
-                </Box>
-              )}
-            </Card>
+            <ItemLayout
+              item={item}
+              accentColor={undefined}
+              viewerIsOwner={isOwner}
+              viewerIsBorrower={isBorrower}
+              onBorrow={() => {
+                // open the existing borrow dialog — same behaviour as current buttons
+                setBorrowDialogOpen(true);
+              }}
+              onRequest={() => {
+                setBorrowDialogOpen(true);
+              }}
+              onReturn={() => {
+                // prefer owner markReturned when owner, otherwise borrower return
+                if (isOwner) {
+                  markReturned();
+                } else {
+                  returnItem();
+                }
+              }}
+              onExtend={() => setExtendDialogOpen(true)}
+              onRemind={() => remindBorrower()}
+            />
 
             {isOwner && pendingRequests.length > 0 && (
               <Card>
@@ -879,23 +757,7 @@ export default function ItemDetail() {
               </Card>
             )}
 
-            {item.status === 'borrowed' && (
-              <Card>
-                <CardContent>
-                  {item.holderName && (
-                    <Typography variant='body2' color='text.secondary'>
-                      Currently borrowed by: {item.holderName}
-                    </Typography>
-                  )}
-                  {item.borrowedUntil && (
-                    <Typography variant='body2' color='text.secondary'>
-                      Return by:{' '}
-                      {new Date(item.borrowedUntil).toLocaleDateString()}
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+            {/* Removed bottom borrowed-info container per UX request */}
           </Stack>
 
           <Dialog
