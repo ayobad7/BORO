@@ -174,6 +174,7 @@ export default function ItemDetail() {
         ownerId: item.ownerId,
         itemId: item.id,
         itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
         borrowerId,
         borrowerName,
         read: false,
@@ -214,6 +215,7 @@ export default function ItemDetail() {
         ownerId: item.ownerId,
         itemId: item.id,
         itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
         borrowerId: user.uid,
         borrowerName: user.displayName || user.email || 'Unknown',
         read: false,
@@ -240,6 +242,42 @@ export default function ItemDetail() {
         borrowedUntil: borrowToDate.toISOString(),
         updatedAt: serverTimestamp(),
       });
+      // notify owner about the immediate grab/borrow
+      try {
+        const nid = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), nid), {
+          id: nid,
+          type: 'grab',
+          ownerId: item.ownerId,
+          itemId: item.id,
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
+          borrowerId: user.uid,
+          borrowerName: user.displayName || user.email || 'Unknown',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        // ignore
+      }
+      // notify owner about the immediate grab/borrow
+      try {
+        const nid = uuidv4();
+        await setDoc(doc(collection(db, 'notifications'), nid), {
+          id: nid,
+          type: 'grab',
+          ownerId: item.ownerId,
+          itemId: item.id,
+          itemTitle: item.title,
+          itemImage: item.imageUrls?.[0] || null,
+          borrowerId: user.uid,
+          borrowerName: user.displayName || user.email || 'Unknown',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        // ignore
+      }
       setBorrowDialogOpen(false);
       setBorrowFromDate(null);
       setBorrowToDate(null);
@@ -594,6 +632,7 @@ export default function ItemDetail() {
                               borrowerName: item.holderName || null,
                               itemId: item.id,
                               itemTitle: item.title,
+                              itemImage: item.imageUrls?.[0] || null,
                               message: msg,
                               read: false,
                               createdAt: serverTimestamp(),

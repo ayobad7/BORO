@@ -87,6 +87,24 @@ export default function ActivityCard({
           borrowedUntil: borrowToDate!.toISOString(),
           updatedAt: serverTimestamp(),
         });
+        // create a quick notification for the owner so they see the grab
+        try {
+          const nid = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
+          await setDoc(doc(collection(db, 'notifications'), nid), {
+            id: nid,
+            type: 'grab',
+            ownerId: item.ownerId,
+            itemId: item.id,
+            itemTitle: item.title,
+            itemImage: item.imageUrls?.[0] || null,
+            borrowerId: user?.uid,
+            borrowerName: user?.displayName || user?.email || 'Unknown',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        } catch (e) {
+          // ignore notification failure
+        }
       } else {
         const reqId = crypto?.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now());
         const req: any = {
@@ -167,6 +185,7 @@ export default function ActivityCard({
         ownerId: item.ownerId,
         itemId: item.id,
         itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
         borrowerId: user.uid,
         borrowerName: user.displayName || user.email || 'Unknown',
         read: false,
@@ -207,6 +226,7 @@ export default function ActivityCard({
         ownerId: item.ownerId,
         itemId: item.id,
         itemTitle: item.title,
+        itemImage: item.imageUrls?.[0] || null,
         borrowerId: item.holderId || null,
         borrowerName: item.holderName || null,
         read: false,
@@ -781,6 +801,7 @@ export default function ActivityCard({
                                         borrowerName: item.holderName || null,
                                         itemId: item.id,
                                         itemTitle: item.title,
+                                        itemImage: item.imageUrls?.[0] || null,
                                         message: msg,
                                         read: false,
                                         createdAt: serverTimestamp(),

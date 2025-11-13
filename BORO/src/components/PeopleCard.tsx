@@ -10,15 +10,11 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import { Link as RouterLink } from 'react-router-dom';
 import { ACCENTS } from '../lib/accents';
+import { v4 as uuidv4 } from 'uuid';
+import { collection, query, where, onSnapshot, getCountFromServer, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  getCountFromServer,
-} from 'firebase/firestore';
+
 
 type Owner = { id: string; name: string; createdAt: number };
 
@@ -32,6 +28,8 @@ export default function PeopleCard({ owners: ownersProp }: PeopleCardProps) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSaving, setInviteSaving] = useState(false);
 
   // If owners not provided, fetch from favoriteStorages
   useEffect(() => {
@@ -93,6 +91,81 @@ export default function PeopleCard({ owners: ownersProp }: PeopleCardProps) {
 
   const openInvite = () => setInviteOpen(true);
   const closeInvite = () => setInviteOpen(false);
+
+  const parseStorageOwnerId = (link: string): string | null => {
+    if (!link) return null;
+    // Try to extract /storage/{id} from the link
+    try {
+      // If user pasted a relative path, ensure it's parseable
+      let urlStr = link.trim();
+      if (urlStr.startsWith('/')) {
+        // prefix with example host to allow URL parsing
+        urlStr = `https://example.com${urlStr}`;
+      } else if (!/^https?:\/\//i.test(urlStr)) {
+        // assume https if protocol missing
+        urlStr = `https://${urlStr}`;
+      }
+      const u = new URL(urlStr);
+      const m = u.pathname.match(/\/storage\/([^/]+)/);
+      if (m) return m[1];
+    } catch (e) {
+      // fallback to regex match anywhere in the string
+      const m2 = link.match(/\/storage\/([^\s\/?#]+)/);
+      if (m2) return m2[1];
+    }
+    return null;
+  };
+
+  const handleAddInvite = async () => {
+    setInviteError(null);
+    const ownerId = parseStorageOwnerId(inviteLink);
+    if (!ownerId) {
+      setInviteError('Could not find a /storage/{id} in the link');
+      return;
+    }
+    if (!user) {
+      setInviteError('Sign in to add favorites');
+      return;
+    }
+    if (ownerId === user.uid) {
+      setInviteError('You cannot add your own storage');
+      return;
+    }
+    setInviteSaving(true);
+    try {
+      // Try to fetch ownerName from an item owned by that owner
+      let ownerNameVal = '';
+      const q = query(collection(db, 'items'), where('ownerId', '==', ownerId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const d = snap.docs[0].data() as any;
+        ownerNameVal = d.ownerName || '';
+      }
+
+      const newId = uuidv4();
+      const fav = {
+        id: newId,
+        userId: user.uid,
+        storageOwnerId: ownerId,
+        storageOwnerName: ownerNameVal,
+        createdAt: Date.now(),
+      };
+      await setDoc(doc(collection(db, 'favoriteStorages'), newId), {
+        ...fav,
+        createdAt: serverTimestamp(),
+      });
+      // reset and close
+      setInviteLink('');
+      setInviteError(null);
+      setInviteOpen(false);
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.error('Invite add failed', e);
+      setInviteError('Failed to add favorite');
+    } finally {
+      setInviteSaving(false);
+    }
+  };
 
   // Visual card container to match ActivityCard styling
   return (
@@ -251,15 +324,20 @@ export default function PeopleCard({ owners: ownersProp }: PeopleCardProps) {
             autoFocus
             fullWidth
             size='small'
-            placeholder='https://app/../storage/USER_ID'
+            placeholder='https://example.com/storage/USER_ID'
             value={inviteLink}
             onChange={(e) => setInviteLink(e.target.value)}
           />
+          {inviteError && (
+            <Typography variant='caption' sx={{ color: '#ff7a7a', mt: 1 }}>
+              {inviteError}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={closeInvite}>Close</Button>
-          <Button onClick={closeInvite} variant='contained'>
-            Add (placeholder)
+          <Button onClick={handleAddInvite} variant='contained' disabled={inviteSaving || !inviteLink.trim()}>
+            {inviteSaving ? 'Adding…' : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>
